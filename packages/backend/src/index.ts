@@ -35,6 +35,22 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Serve uploaded files statically for document preview
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// Root health & welcome check
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'LedgerLens Backend API',
+    status: 'online',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      ollama: '/api/ollama/status',
+      documents: '/api/documents',
+      expenses: '/api/expenses',
+      analytics: '/api/analytics'
+    }
+  });
+});
+
 // API routes
 app.use('/api', healthRouter);
 app.use('/api/documents', documentsRouter);

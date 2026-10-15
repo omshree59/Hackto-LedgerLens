@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { NavItem, OllamaStatus } from '../../types';
 import { COIN_FEATURES, type CoinFeature } from './coinData';
 import {
@@ -538,7 +541,8 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     scene.add(skyboxGroup);
 
     const nebulaUniforms = {
-      uTime: { value: 0 }
+      uTime: { value: 0 },
+      uFocusX: { value: 0 }
     };
 
     const nebulaGeo = new THREE.SphereGeometry(50, 40, 40);
@@ -596,21 +600,22 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
           // Diagonal galactic plane coordinate matching reference image
           float diagBand = exp(-pow((d.y - d.x * 0.65) * 1.75, 2.0));
 
-          // Domain-warped FBM clouds
+          // Upward-drifting domain-warped FBM clouds ("up effect" flow)
+          vec3 flowOffset = vec3(-uTime * 0.018, -uTime * 0.055, 0.0);
           vec3 q = vec3(
-            fbm(d * 2.4 + vec3(t, -t * 0.6, 0.0)),
-            fbm(d * 2.4 + vec3(1.4, 2.9, -t * 0.5)),
-            fbm(d * 2.4 + vec3(-2.1, t * 0.4, 1.7))
+            fbm(d * 2.4 + flowOffset + vec3(t, -t * 0.6, 0.0)),
+            fbm(d * 2.4 + flowOffset + vec3(1.4, 2.9, -t * 0.5)),
+            fbm(d * 2.4 + flowOffset + vec3(-2.1, t * 0.4, 1.7))
           );
-          float cloud = fbm(d * 3.0 + q * 1.45 + vec3(t * 0.4));
+          float cloud = fbm(d * 3.0 + q * 1.45 + flowOffset * 1.3);
           float wisps = smoothstep(0.26, 0.78, cloud) * (0.42 + 0.75 * diagBand);
 
           // Deep cosmic base
-          vec3 col = vec3(0.012, 0.014, 0.032);
+          vec3 col = vec3(0.010, 0.012, 0.028);
 
           // Lower-left celestial blue/indigo nebula
           float blueMask = smoothstep(-0.65, 0.55, -d.x * 0.5 - d.y * 0.35 + (q.x - 0.45));
-          vec3 blueNebula = mix(vec3(0.08, 0.18, 0.42), vec3(0.28, 0.50, 0.86), cloud);
+          vec3 blueNebula = mix(vec3(0.08, 0.18, 0.42), vec3(0.28, 0.52, 0.90), cloud);
           col += blueNebula * wisps * blueMask * 1.15;
 
           // Upper-right magenta/rose/violet nebula
@@ -743,6 +748,263 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     particles.frustumCulled = false;
     skyboxGroup.add(particles);
 
+    // 5.6 Sparse, Delicate Shooting-Star Motion Streaks (Cinematic falling sense of depth, not dense rain)
+    const upStreakCount = 16;
+    const upStreakBaseGeo = new THREE.PlaneGeometry(0.022, 1.8);
+    const upStreakMat = new THREE.ShaderMaterial({
+      uniforms: nebulaUniforms,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `
+        attribute vec3 aOffset;
+        attribute vec3 aStreakColor;
+        attribute vec2 aParams; // x: speed, y: phase
+        uniform float uTime;
+        varying vec2 vUv;
+        varying vec3 vColor;
+        varying float vAlpha;
+
+        void main() {
+          vUv = uv;
+          vColor = aStreakColor;
+
+          float speed = aParams.x;
+          float phase = aParams.y;
+          float cycle = fract(uTime * speed + phase);
+
+          // Only visible for a brief window in its cycle so only a few delicate streaks appear at once
+          vAlpha = smoothstep(0.15, 0.35, cycle) * smoothstep(0.85, 0.55, cycle) * 0.45;
+
+          vec3 pos = position;
+          pos.y *= (0.7 + 0.6 * fract(phase * 7.3));
+
+          // Diagonal orientation matching the Pinterest astronaut falling perspective
+          float tiltAngle = -0.62;
+          float c = cos(tiltAngle);
+          float s = sin(tiltAngle);
+          vec2 rotatedXY = vec2(pos.x * c - pos.y * s, pos.x * s + pos.y * c);
+          pos.x = rotatedXY.x;
+          pos.y = rotatedXY.y;
+
+          float travel = 9.0;
+          vec3 worldOffset = aOffset;
+          worldOffset.y += (cycle - 0.5) * travel;
+          worldOffset.x += (cycle - 0.5) * travel * 0.72;
+
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos + worldOffset, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        varying vec3 vColor;
+        varying float vAlpha;
+
+        void main() {
+          float horiz = exp(-pow((vUv.x - 0.5) * 9.0, 2.0));
+          float vert = smoothstep(0.0, 0.25, vUv.y) * smoothstep(1.0, 0.15, vUv.y);
+          float intensity = horiz * vert * vAlpha;
+          if (intensity < 0.005) discard;
+
+          gl_FragColor = vec4(vColor, clamp(intensity, 0.0, 1.0));
+        }
+      `
+    });
+
+    const upStreakGeo = new THREE.InstancedBufferGeometry();
+    upStreakGeo.index = upStreakBaseGeo.index;
+    upStreakGeo.attributes.position = upStreakBaseGeo.attributes.position;
+    upStreakGeo.attributes.uv = upStreakBaseGeo.attributes.uv;
+
+    const streakOffsets = new Float32Array(upStreakCount * 3);
+    const streakColors = new Float32Array(upStreakCount * 3);
+    const streakParams = new Float32Array(upStreakCount * 2);
+
+    for (let i = 0; i < upStreakCount; i++) {
+      streakOffsets[i * 3] = (Math.random() - 0.5) * 28.0;
+      streakOffsets[i * 3 + 1] = -3.5 + (Math.random() - 0.5) * 9.0;
+      streakOffsets[i * 3 + 2] = -3.5 - Math.random() * 10.0;
+
+      const isBlue = i % 2 === 0;
+      streakColors[i * 3] = isBlue ? 0.72 : 1.0;
+      streakColors[i * 3 + 1] = isBlue ? 0.88 : 1.0;
+      streakColors[i * 3 + 2] = 1.0;
+
+      streakParams[i * 2] = 0.045 + Math.random() * 0.05;
+      streakParams[i * 2 + 1] = i / upStreakCount + Math.random() * 0.05;
+    }
+
+    upStreakGeo.setAttribute('aOffset', new THREE.InstancedBufferAttribute(streakOffsets, 3));
+    upStreakGeo.setAttribute('aStreakColor', new THREE.InstancedBufferAttribute(streakColors, 3));
+    upStreakGeo.setAttribute('aParams', new THREE.InstancedBufferAttribute(streakParams, 2));
+
+    const upStreaksMesh = new THREE.Mesh(upStreakGeo, upStreakMat);
+    upStreaksMesh.frustumCulled = false;
+    scene.add(upStreaksMesh);
+
+    // 5.7 Photoreal NASA EVA Astronaut falling off the coin platform (public-domain NASA 3D Resources GLB)
+    // Root lives inside coinsGroup so the astronaut stands on, and falls from, the actual rack surface.
+    const astronautRoot = new THREE.Group();
+    // (attached to coinsGroup once the conveyor group is created below)
+
+    // Inner pivot so we can tumble the body independently of the fall trajectory
+    const astronautBody = new THREE.Group();
+    astronautRoot.add(astronautBody);
+
+    // Soft Stellar Backlight & Horizontal Anamorphic Lens Flare behind the falling astronaut
+    const astroFlareGeo = new THREE.PlaneGeometry(9.0, 3.6);
+    const astroFlareMat = new THREE.ShaderMaterial({
+      uniforms: nebulaUniforms,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv - vec2(0.5);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        varying vec2 vUv;
+        void main() {
+          float d = length(vUv * vec2(1.8, 1.0));
+          float pulse = 0.92 + 0.08 * sin(uTime * 1.8);
+          float core = exp(-d * d * 60.0) * pulse;
+          float warmGlow = exp(-d * 7.5) * 0.22;
+          float blueNebulaHalo = exp(-d * 3.6) * 0.14;
+          float hStreak = exp(-abs(vUv.y) * 60.0) * exp(-abs(vUv.x) * 4.5) * pulse;
+          vec3 col = vec3(0.18, 0.46, 0.95) * blueNebulaHalo;
+          col += vec3(1.0, 0.72, 0.38) * warmGlow;
+          col += vec3(0.58, 0.86, 1.0) * hStreak * 0.4;
+          col += vec3(1.0, 0.98, 0.92) * core * 0.45;
+          float alpha = clamp(core * 0.6 + warmGlow * 0.6 + blueNebulaHalo * 0.55 + hStreak * 0.35, 0.0, 0.55);
+          gl_FragColor = vec4(col, alpha);
+        }
+      `
+    });
+    const astroFlareMesh = new THREE.Mesh(astroFlareGeo, astroFlareMat);
+    astroFlareMesh.position.set(0.0, 0.9, -2.4);
+    astronautRoot.add(astroFlareMesh);
+
+    // Dedicated cinematic key + cool rim lights so the white suit reads as photoreal against black space
+    const astroKeyLight = new THREE.SpotLight(0xfff4e6, 9.0, 14.0, 0.75, 0.6, 1.3);
+    astroKeyLight.position.set(2.2, 3.4, 3.0);
+    astroKeyLight.castShadow = false;
+    astronautRoot.add(astroKeyLight);
+    astroKeyLight.target = astronautBody;
+
+    const astroRimLight = new THREE.PointLight(0x9ecbff, 4.5, 9.0, 1.6);
+    astroRimLight.position.set(-1.6, 1.8, -1.4);
+    astronautRoot.add(astroRimLight);
+
+    // Photoreal PBR environment reflections (applied ONLY to the astronaut materials, coins keep their look)
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const astroEnvTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmremGenerator.dispose();
+
+    const astroGeometries: THREE.BufferGeometry[] = [astroFlareGeo];
+    const astroMaterials: THREE.Material[] = [];
+    let astronautModel: THREE.Object3D | null = null;
+    let astronautLoaderDisposed = false;
+    let astroCycleStart = 0; // Cycle begins the moment the model finishes loading
+
+    const astroShadowSuitHeight = 1.75; // World-unit height of the normalized astronaut
+
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('/draco/');
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+    gltfLoader.load(
+      '/models/astronaut.glb',
+      (gltf) => {
+        if (astronautLoaderDisposed) {
+          gltf.scene.traverse((obj) => {
+            const mesh = obj as THREE.Mesh;
+            if (mesh.isMesh) {
+              mesh.geometry.dispose();
+              (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(m => m.dispose());
+            }
+          });
+          return;
+        }
+
+        const model = gltf.scene;
+
+        // Normalize scale: fit height to astroShadowSuitHeight and place feet at local y = 0
+        const bbox = new THREE.Box3().setFromObject(model);
+        const size = new THREE.Vector3();
+        bbox.getSize(size);
+        const normScale = astroShadowSuitHeight / Math.max(size.y, 0.0001);
+        model.scale.setScalar(normScale);
+
+        const bbox2 = new THREE.Box3().setFromObject(model);
+        const center = new THREE.Vector3();
+        bbox2.getCenter(center);
+        model.position.set(-center.x, -bbox2.min.y, -center.z);
+
+        model.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          astroGeometries.push(mesh.geometry);
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          mats.forEach((m) => {
+            const std = m as THREE.MeshStandardMaterial;
+            if ((std as any).isMeshStandardMaterial) {
+              std.envMap = astroEnvTexture;
+              std.envMapIntensity = 0.65;
+              std.roughness = Math.min(std.roughness, 0.58);
+              std.metalness = Math.max(std.metalness, 0.06);
+              std.needsUpdate = true;
+            }
+            m.transparent = false;
+            m.opacity = 1.0;
+            astroMaterials.push(m);
+          });
+        });
+
+        astronautBody.add(model);
+        astronautModel = model;
+        astroCycleStart = clock.getElapsedTime();
+      },
+      undefined,
+      (err) => {
+        console.error('Failed to load astronaut model:', err);
+      }
+    );
+
+    // Fall-from-platform choreography constants (rack top surface sits at local y ≈ -0.175)
+    const RACK_TOP_Y = -0.175;
+    const RACK_FRONT_Z = 1.22;
+    const ASTRO_CYCLE = 16.0;         // Full loop duration (seconds)
+    const ASTRO_STAND_END = 3.2;      // Standing at the platform edge, swaying
+    const ASTRO_TIP_END = 4.6;        // Losing balance & tipping over the edge
+    const ASTRO_FALL_END = 14.0;      // Slow-motion weightless tumble into deep space
+    const astroEuler = new THREE.Euler();
+    const astroFlareWorldPos = new THREE.Vector3();
+    const astroCamWorldPos = new THREE.Vector3();
+    const smoothstep = (a: number, b: number, x: number) => {
+      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+    const setAstronautOpacity = (o: number) => {
+      const needsBlend = o < 0.995;
+      for (let i = 0; i < astroMaterials.length; i++) {
+        const m = astroMaterials[i];
+        m.opacity = o;
+        if (m.transparent !== needsBlend) {
+          m.transparent = needsBlend;
+          m.needsUpdate = true;
+        }
+      }
+      astronautBody.visible = o > 0.01;
+      astroFlareMesh.visible = o > 0.02;
+    };
+
     // 6. Shared Geometries (64 radial segments for ultra-smooth silhouette rim)
     const coinGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.25, 64);
     const pedestalGeo = new THREE.BoxGeometry(1.6, 0.86, 2.1);
@@ -777,6 +1039,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     coinsGroup.rotation.y = 0.26;
     coinsGroup.rotation.x = 0.035;
     scene.add(coinsGroup);
+    coinsGroup.add(astronautRoot);
 
     const TOTAL_WIDTH = (TOTAL_COINS - 1) * SPACING;
 
@@ -824,6 +1087,8 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     const disposableMaterials: THREE.Material[] = [
       nebulaMat,
       particleMat,
+      upStreakMat,
+      astroFlareMat,
       pedestalMat,
       grooveMat,
       hitProxyMat,
@@ -1157,8 +1422,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       }
 
       // --- 3. Dynamic Spotlight Tracking (Zero per-frame Color allocation) ---
+      const focusX = START_X + currentPos * SPACING;
+      nebulaUniforms.uFocusX.value = focusX;
       if (activeSpotlightRef.current) {
-        const focusX = START_X + currentPos * SPACING;
         const activeColor = items[roundedIndex]?.colorObj;
         if (activeColor) {
           activeSpotlightRef.current.color.lerp(activeColor, 0.15);
@@ -1166,13 +1432,68 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         activeSpotlightRef.current.position.x += (focusX - activeSpotlightRef.current.position.x) * (1.0 - Math.exp(-14.0 * delta));
       }
 
-      // --- 4. Cosmic Nebula & Starfield Animation (Follows camera to prevent far-plane clipping) ---
+      // --- 4. Cosmic Nebula, Starfield & Falling Astronaut Animation ---
       skyboxGroup.position.copy(camera.position);
       if (isPlayingRef.current) {
         nebulaUniforms.uTime.value = elapsedTime;
         particles.rotation.y = elapsedTime * 0.012;
         particles.rotation.z = Math.sin(elapsedTime * 0.05) * 0.025;
         nebulaMesh.rotation.y = elapsedTime * 0.008;
+
+        // ===== Astronaut: stands at the platform edge beside the focused coin, tips over, and tumbles into space =====
+        const cycleT = astronautModel ? (elapsedTime - astroCycleStart) % ASTRO_CYCLE : -1;
+        // Stand one slot to the left of the focused coin, right at the front lip of the rack
+        const standX = focusX - SPACING * 0.55;
+
+        if (cycleT < 0) {
+          setAstronautOpacity(0.0);
+        } else if (cycleT < ASTRO_STAND_END) {
+          // Phase A: standing on the platform edge with a gentle, uneasy sway
+          const sway = Math.sin(elapsedTime * 1.6) * 0.035;
+          astronautRoot.position.set(standX, RACK_TOP_Y, RACK_FRONT_Z);
+          astronautBody.position.set(0, 0, 0);
+          astronautBody.rotation.set(sway * 0.6, 0.18 + Math.sin(elapsedTime * 0.7) * 0.08, sway);
+          setAstronautOpacity(smoothstep(0.0, 0.9, cycleT));
+        } else if (cycleT < ASTRO_TIP_END) {
+          // Phase B: loses balance, leans and tips forward over the front edge
+          const tipT = smoothstep(ASTRO_STAND_END, ASTRO_TIP_END, cycleT);
+          const lean = tipT * tipT;
+          astronautRoot.position.set(standX, RACK_TOP_Y - lean * 0.25, RACK_FRONT_Z + lean * 0.55);
+          astronautBody.position.set(0, 0, 0);
+          astronautBody.rotation.set(lean * 0.95, 0.18 + lean * 0.3, -lean * 0.25);
+          setAstronautOpacity(1.0);
+        } else if (cycleT < ASTRO_FALL_END) {
+          // Phase C: slow-motion weightless free-fall & tumble away from the platform into deep space
+          const fallSec = cycleT - ASTRO_TIP_END;
+          const fallT = fallSec / (ASTRO_FALL_END - ASTRO_TIP_END);
+          // Gentle gravity: slow, eased weightless descent that stays within the cinematic frame
+          const drop = fallSec * 0.22 + fallSec * fallSec * 0.026;
+          const outward = fallSec * 0.24;
+          const sideways = fallSec * 0.10 + Math.sin(fallSec * 0.9) * 0.16;
+          astronautRoot.position.set(standX + sideways, RACK_TOP_Y - 0.25 - drop, RACK_FRONT_Z + 0.55 + outward);
+
+          // Continuous tumble: pitch over backward (head-first) with a slow roll, like the reference video
+          astroEuler.set(
+            0.95 + fallSec * 0.62,
+            0.48 + Math.sin(fallSec * 0.55) * 0.35,
+            -0.25 - fallSec * 0.28
+          );
+          astronautBody.rotation.copy(astroEuler);
+          astronautBody.position.set(0, 0, 0);
+
+          // Fade into the void during the final stretch of the fall
+          setAstronautOpacity(1.0 - smoothstep(0.72, 1.0, fallT));
+        } else {
+          // Phase D: hidden while resetting back to the platform edge
+          setAstronautOpacity(0.0);
+          astronautRoot.position.set(standX, RACK_TOP_Y, RACK_FRONT_Z);
+          astronautBody.rotation.set(0, 0.18, 0);
+        }
+
+        // Keep the stellar backlight billboarded toward the camera behind the astronaut's torso
+        astroFlareMesh.getWorldPosition(astroFlareWorldPos);
+        camera.getWorldPosition(astroCamWorldPos);
+        astroFlareMesh.lookAt(astroCamWorldPos);
       }
 
       // --- 5. Event-Driven Raycasting (Only raycast when pointer or camera moved) ---
@@ -1295,8 +1616,16 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       controls.dispose();
 
       // Dispose all geometries
+      astronautLoaderDisposed = true;
+      dracoLoader.dispose();
+      if (astronautModel) astronautBody.remove(astronautModel);
+      astroEnvTexture.dispose();
+      astroMaterials.forEach(m => m.dispose());
       nebulaGeo.dispose();
       particleGeo.dispose();
+      upStreakBaseGeo.dispose();
+      upStreakGeo.dispose();
+      astroGeometries.forEach(g => g.dispose());
       rackBaseGeo.dispose();
       edgeNeonGeo.dispose();
       coinGeo.dispose();
