@@ -157,6 +157,14 @@ router.post('/reset', (req, res) => {
     }
   }
 
+  // Clear organized exported directory
+  const organizedDir = path.join(EXPORTS_DIR, 'organized');
+  if (fs.existsSync(organizedDir)) {
+    try {
+      fs.rmSync(organizedDir, { recursive: true, force: true });
+    } catch {}
+  }
+
   res.json({ success: true, message: 'All application records and local files have been reset.' });
 });
 

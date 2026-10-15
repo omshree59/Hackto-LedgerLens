@@ -20,6 +20,7 @@ export const InvoicesPage: React.FC<InvoicesPageProps> = ({
       onOpenReview={onOpenReview}
       onOpenUpload={onOpenUpload}
       globalSearch={globalSearch}
+      spotlightColor="#B45BFF"
     />
   );
 };

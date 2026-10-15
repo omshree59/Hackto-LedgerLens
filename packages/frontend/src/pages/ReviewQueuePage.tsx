@@ -20,6 +20,7 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
       onOpenReview={onOpenReview}
       onOpenUpload={onOpenUpload}
       globalSearch={globalSearch}
+      spotlightColor="#FFB000"
     />
   );
 };

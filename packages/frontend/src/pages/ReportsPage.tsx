@@ -21,6 +21,8 @@ import {
   CartesianGrid
 } from 'recharts';
 import { api } from '../api/client';
+import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
+import CountUp from '../components/reactbits/CountUp';
 
 export const ReportsPage: React.FC = () => {
   const [year, setYear] = useState('2026');
@@ -91,33 +93,48 @@ export const ReportsPage: React.FC = () => {
 
       {/* Tax & Grand Totals Summary Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-2">
+        <WorkspaceCard spotlightColor="#10b981" className="space-y-2">
           <span className="text-[11px] uppercase font-bold text-slate-400">Total Recorded Spend ({year})</span>
-          <div className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">
-            ${totalYearSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
+          <CountUp
+            to={totalYearSpend}
+            decimals={2}
+            prefix="$"
+            separator=","
+            duration={1.2}
+            className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono"
+          />
           <p className="text-[11px] text-slate-400">Total approved expenses across all categories</p>
-        </div>
+        </WorkspaceCard>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-2">
+        <WorkspaceCard spotlightColor="#00D6A0" className="space-y-2">
           <span className="text-[11px] uppercase font-bold text-slate-400">Total Sales Tax / VAT Paid</span>
-          <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
-            ${(data?.taxSummary?.totalTax || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
+          <CountUp
+            to={data?.taxSummary?.totalTax || 0}
+            decimals={2}
+            prefix="$"
+            separator=","
+            duration={1.2}
+            className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono"
+          />
           <p className="text-[11px] text-slate-400">Identified on invoices with explicit tax amounts</p>
-        </div>
+        </WorkspaceCard>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-2">
+        <WorkspaceCard spotlightColor="#38bdf8" className="space-y-2">
           <span className="text-[11px] uppercase font-bold text-slate-400">Net Subtotal Before Tax</span>
-          <div className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono">
-            ${(data?.taxSummary?.totalSubtotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
+          <CountUp
+            to={data?.taxSummary?.totalSubtotal || 0}
+            decimals={2}
+            prefix="$"
+            separator=","
+            duration={1.2}
+            className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono"
+          />
           <p className="text-[11px] text-slate-400">Pre-tax business deductions basis</p>
-        </div>
+        </WorkspaceCard>
       </div>
 
       {/* Monthly Breakdown Chart */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-4">
+      <WorkspaceCard spotlightColor="#10b981" className="space-y-4">
         <div>
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">Monthly Expense Distribution</h3>
           <p className="text-[11px] text-slate-400">Fiscal year monthly spending volume</p>
@@ -143,12 +160,12 @@ export const ReportsPage: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
+      </WorkspaceCard>
 
       {/* Category & Vendor Breakdown Side-by-Side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Category breakdown table */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-3">
+        <WorkspaceCard spotlightColor="#8b5cf6" className="space-y-3">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">Spending by Category</h3>
           <div className="divide-y divide-slate-100 dark:divide-[#152e23] text-xs">
             {data?.categoryData?.map((c: any) => (
@@ -169,10 +186,10 @@ export const ReportsPage: React.FC = () => {
               <div className="py-6 text-center text-slate-400">No category records</div>
             )}
           </div>
-        </div>
+        </WorkspaceCard>
 
         {/* Top Vendors breakdown table */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-3">
+        <WorkspaceCard spotlightColor="#06B6D4" className="space-y-3">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white">Top Vendors by Spend</h3>
           <div className="divide-y divide-slate-100 dark:divide-[#152e23] text-xs">
             {data?.vendorData?.map((v: any) => (
@@ -188,7 +205,7 @@ export const ReportsPage: React.FC = () => {
               <div className="py-6 text-center text-slate-400">No vendor records</div>
             )}
           </div>
-        </div>
+        </WorkspaceCard>
       </div>
     </div>
   );

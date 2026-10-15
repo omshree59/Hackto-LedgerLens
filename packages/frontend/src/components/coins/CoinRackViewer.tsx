@@ -889,14 +889,14 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     astroFlareMesh.position.set(0.0, 0.9, -2.4);
     astronautRoot.add(astroFlareMesh);
 
-    // Dedicated cinematic key + cool rim lights so the white suit reads as photoreal against black space
-    const astroKeyLight = new THREE.SpotLight(0xfff4e6, 9.0, 14.0, 0.75, 0.6, 1.3);
+    // Key + cool rim. Kept moderate so the suit's red bands, flags, and gold visor are not blown to white.
+    const astroKeyLight = new THREE.SpotLight(0xfff4e6, 5.4, 14.0, 0.75, 0.6, 1.3);
     astroKeyLight.position.set(2.2, 3.4, 3.0);
     astroKeyLight.castShadow = false;
     astronautRoot.add(astroKeyLight);
     astroKeyLight.target = astronautBody;
 
-    const astroRimLight = new THREE.PointLight(0x9ecbff, 4.5, 9.0, 1.6);
+    const astroRimLight = new THREE.PointLight(0x9ecbff, 3.2, 9.0, 1.6);
     astroRimLight.position.set(-1.6, 1.8, -1.4);
     astronautRoot.add(astroRimLight);
 
@@ -907,6 +907,11 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     const astroGeometries: THREE.BufferGeometry[] = [astroFlareGeo];
     const astroMaterials: THREE.Material[] = [];
+    // Recolored EMU albedo: cool beta-cloth, thickened red leg bands, saturated flag and NASA patches.
+    const astroSuitMap = new THREE.TextureLoader().load('/models/astronaut-suit.png');
+    astroSuitMap.flipY = false;
+    astroSuitMap.colorSpace = THREE.SRGBColorSpace;
+    astroSuitMap.anisotropy = 4;
     let astronautModel: THREE.Object3D | null = null;
     let astronautLoaderDisposed = false;
     let astroCycleStart = 0; // Cycle begins the moment the model finishes loading
@@ -944,21 +949,84 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         const center = new THREE.Vector3();
         bbox2.getCenter(center);
         model.position.set(-center.x, -bbox2.min.y, -center.z);
+        model.updateMatrixWorld(true);
+
+        const modelBox = new THREE.Box3().setFromObject(model);
+        const modelHeight = Math.max(modelBox.max.y - modelBox.min.y, 0.0001);
+        const modelHalfW = Math.max((modelBox.max.x - modelBox.min.x) * 0.5, 0.0001);
+        const modelCenterX = (modelBox.min.x + modelBox.max.x) * 0.5;
+        const astroVert = new THREE.Vector3();
+        const astroNormal = new THREE.Vector3();
+        const astroNormalMatrix = new THREE.Matrix3();
 
         model.traverse((obj) => {
           const mesh = obj as THREE.Mesh;
           if (!mesh.isMesh) return;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
-          astroGeometries.push(mesh.geometry);
+
+          const sourceGeo = mesh.geometry;
+          const geo = sourceGeo.clone();
+          mesh.geometry = geo;
+          astroGeometries.push(geo);
+          sourceGeo.dispose();
+
+          const meshBox = new THREE.Box3().setFromObject(mesh);
+          const meshMidY = (meshBox.min.y + meshBox.max.y) * 0.5;
+          const meshHeight = meshBox.max.y - meshBox.min.y;
+          const isVisor = meshHeight < modelHeight * 0.4
+            && (meshMidY - modelBox.min.y) / modelHeight > 0.72;
+
+          // Limb bands and the gold visor are painted in vertex colors so they sit on the
+          // body itself. The albedo's red stripe faces away from the camera.
+          const position = geo.attributes.position;
+          const normal = geo.attributes.normal;
+          const colors = new Float32Array(position.count * 3);
+          astroNormalMatrix.getNormalMatrix(mesh.matrixWorld);
+          for (let i = 0; i < position.count; i++) {
+            astroVert.fromBufferAttribute(position as THREE.BufferAttribute, i).applyMatrix4(mesh.matrixWorld);
+            const t = (astroVert.y - modelBox.min.y) / modelHeight;
+            const dx = Math.abs(astroVert.x - modelCenterX) / modelHalfW;
+            let r = 1, g = 1, b = 1;
+            if (normal) {
+              astroNormal.fromBufferAttribute(normal as THREE.BufferAttribute, i).applyMatrix3(astroNormalMatrix).normalize();
+              if (t > 0.80 && astroNormal.z > 0.25) {
+                r = 1.0; g = 0.68; b = 0.22;
+              }
+            }
+            const legBand = t > 0.14 && t < 0.30 && dx > 0.18;
+            const armBand = t > 0.55 && t < 0.72 && dx > 0.42;
+            if (legBand || armBand) {
+              r = 0.72; g = 0.06; b = 0.08;
+            }
+            colors[i * 3] = r;
+            colors[i * 3 + 1] = g;
+            colors[i * 3 + 2] = b;
+          }
+          geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
           mats.forEach((m) => {
             const std = m as THREE.MeshStandardMaterial;
             if ((std as any).isMeshStandardMaterial) {
               std.envMap = astroEnvTexture;
-              std.envMapIntensity = 0.65;
-              std.roughness = Math.min(std.roughness, 0.58);
-              std.metalness = Math.max(std.metalness, 0.06);
+              std.vertexColors = true;
+              if (isVisor) {
+                // Gold-coated sun visor: reflective, so the nebula reads in the glass
+                if (std.map) std.map.dispose();
+                std.map = null;
+                std.color.set(0xf0c14a);
+                std.metalness = 0.94;
+                std.roughness = 0.14;
+                std.envMapIntensity = 1.55;
+              } else {
+                if (std.map) std.map.dispose();
+                std.map = astroSuitMap;
+                std.color.set(0xffffff);
+                std.metalness = 0.04;
+                std.roughness = 0.62;
+                std.envMapIntensity = 0.32;
+              }
               std.needsUpdate = true;
             }
             m.transparent = false;
@@ -1620,6 +1688,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       dracoLoader.dispose();
       if (astronautModel) astronautBody.remove(astronautModel);
       astroEnvTexture.dispose();
+      astroSuitMap.dispose();
       astroMaterials.forEach(m => m.dispose());
       nebulaGeo.dispose();
       particleGeo.dispose();

@@ -70,17 +70,24 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-const server = app.listen(CONFIG.PORT, CONFIG.HOST, () => {
-  console.log(`===================================================`);
-  console.log(`  LedgerLens Backend running at http://${CONFIG.HOST}:${CONFIG.PORT}`);
-  console.log(`  Local AI target: ${CONFIG.OLLAMA_BASE_URL} (${CONFIG.DEFAULT_MODEL})`);
-  console.log(`===================================================`);
-});
+export { app };
 
-// Graceful shutdown
-process.on('SIGINT', () => {
-  server.close(() => {
-    console.log('Server stopped');
-    process.exit(0);
+let server: any = null;
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(CONFIG.PORT, CONFIG.HOST, () => {
+    console.log(`===================================================`);
+    console.log(`  LedgerLens Backend running at http://${CONFIG.HOST}:${CONFIG.PORT}`);
+    console.log(`  Local AI target: ${CONFIG.OLLAMA_BASE_URL} (${CONFIG.DEFAULT_MODEL})`);
+    console.log(`===================================================`);
   });
-});
+
+  // Graceful shutdown
+  process.on('SIGINT', () => {
+    if (server) {
+      server.close(() => {
+        console.log('Server stopped');
+        process.exit(0);
+      });
+    }
+  });
+}

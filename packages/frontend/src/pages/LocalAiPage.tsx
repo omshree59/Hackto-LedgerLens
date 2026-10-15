@@ -14,6 +14,7 @@ import {
   Server
 } from 'lucide-react';
 import { api } from '../api/client';
+import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
 import type { OllamaStatus } from '../types';
 
 export const LocalAiPage: React.FC = () => {
@@ -147,7 +148,7 @@ export const LocalAiPage: React.FC = () => {
       {/* Grid: Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: Connection Health */}
-        <div className="p-5 rounded-2xl bg-[#091513] border border-slate-800/80 shadow-lg space-y-3">
+        <WorkspaceCard surface="#091513" spotlightColor="#00D6A0" className="space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span className="font-semibold uppercase tracking-wider">Engine Connectivity</span>
             <Server className="size-4 text-emerald-400" />
@@ -166,10 +167,10 @@ export const LocalAiPage: React.FC = () => {
           <div className="text-xs text-slate-400 font-mono">
             Endpoint: http://127.0.0.1:11434
           </div>
-        </div>
+        </WorkspaceCard>
 
         {/* Card 2: Active Model */}
-        <div className="p-5 rounded-2xl bg-[#091513] border border-slate-800/80 shadow-lg space-y-3">
+        <WorkspaceCard surface="#091513" spotlightColor="#B45BFF" className="space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span className="font-semibold uppercase tracking-wider">Configured Model</span>
             <Sparkles className="size-4 text-purple-400" />
@@ -184,10 +185,10 @@ export const LocalAiPage: React.FC = () => {
               <span className="text-amber-400">⚠ Not yet installed (`ollama pull`)</span>
             )}
           </div>
-        </div>
+        </WorkspaceCard>
 
         {/* Card 3: Privacy Shield */}
-        <div className="p-5 rounded-2xl bg-[#091513] border border-slate-800/80 shadow-lg space-y-3">
+        <WorkspaceCard surface="#091513" spotlightColor="#14b8a6" className="space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span className="font-semibold uppercase tracking-wider">Privacy Architecture</span>
             <Shield className="size-4 text-teal-400" />
@@ -198,7 +199,7 @@ export const LocalAiPage: React.FC = () => {
           <div className="text-xs text-slate-400">
             OCR and LLM extraction run locally on host RAM/VRAM.
           </div>
-        </div>
+        </WorkspaceCard>
       </div>
 
       {/* Main Two-Column Layout */}

@@ -15,6 +15,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { api } from '../api/client';
+import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
 import type { OllamaStatus } from '../types';
 
 export const SettingsPage: React.FC = () => {
@@ -121,7 +122,7 @@ export const SettingsPage: React.FC = () => {
       )}
 
       {/* Card 1: Local AI Engine (Gemma + Ollama) */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-4">
+      <WorkspaceCard spotlightColor="#00D6A0" className="!p-6 space-y-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
@@ -192,10 +193,10 @@ export const SettingsPage: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
+      </WorkspaceCard>
 
       {/* Card 2: Local Storage & Organization */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-4">
+      <WorkspaceCard spotlightColor="#3b82f6" className="!p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
             <HardDrive className="size-5" />
@@ -258,10 +259,10 @@ export const SettingsPage: React.FC = () => {
             </p>
           </div>
         )}
-      </div>
+      </WorkspaceCard>
 
       {/* Card 3: Privacy Guarantee */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-3">
+      <WorkspaceCard spotlightColor="#14b8a6" className="!p-6 space-y-3">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center">
             <Lock className="size-5" />
@@ -283,10 +284,10 @@ export const SettingsPage: React.FC = () => {
             • <strong>No Telemetry by Default:</strong> No tracking cookies, usage analytics, or external trackers are initialized.
           </p>
         </div>
-      </div>
+      </WorkspaceCard>
 
       {/* Card 4: Demo Data & Danger Zone */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-4">
+      <WorkspaceCard spotlightColor="#f43f5e" className="!p-6 space-y-4">
         <h3 className="font-bold text-sm text-slate-900 dark:text-white">Data Management</h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -324,7 +325,7 @@ export const SettingsPage: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
+      </WorkspaceCard>
     </div>
   );
 };

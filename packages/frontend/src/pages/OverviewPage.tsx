@@ -29,6 +29,8 @@ import {
 } from 'recharts';
 import { api } from '../api/client';
 import type { DashboardData, DocumentType } from '../types';
+import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
+import CountUp from '../components/reactbits/CountUp';
 
 interface OverviewPageProps {
   onOpenReview: (id: string) => void;
@@ -147,24 +149,23 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           <div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Welcome to LedgerLens</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
-              No financial documents have been imported yet. Upload your first PDF invoice or populate realistic sample data to explore the workspace.
+              Your private local ledger is ready. Import your first invoice or receipt to automatically extract details with local AI.
             </p>
           </div>
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={onOpenUpload}
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 cursor-pointer flex items-center gap-2"
             >
+              <UploadCloud className="size-4" />
               Import Invoices
             </button>
             <button
-              onClick={async () => {
-                await api.seedDemo();
-                loadDashboard();
-              }}
-              className="px-4 py-2.5 rounded-xl border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-semibold text-xs cursor-pointer"
+              onClick={() => onNavigateTab('invoices')}
+              className="px-4 py-2.5 rounded-xl border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-semibold text-xs cursor-pointer flex items-center gap-1.5"
             >
-              Load Demo Records (Labeled)
+              Explore Invoices
+              <ArrowRight className="size-3.5" />
             </button>
           </div>
         </div>
@@ -173,7 +174,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       {/* 4 Primary KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Invoices */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-3">
+        <WorkspaceCard spotlightColor="#00D6A0" className="space-y-3">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Total Invoices</span>
             <div className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
@@ -181,17 +182,19 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             </div>
           </div>
           <div>
-            <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {data?.metrics.totalInvoices ?? 0}
-            </div>
+            <CountUp
+              to={data?.metrics.totalInvoices ?? 0}
+              duration={1.1}
+              className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight"
+            />
             <p className="text-[11px] text-slate-400 mt-0.5">
               + {data?.metrics.totalReceipts ?? 0} receipts tracked
             </p>
           </div>
-        </div>
+        </WorkspaceCard>
 
         {/* Total Recorded Expenses */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-3">
+        <WorkspaceCard spotlightColor="#3b82f6" className="space-y-3">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Recorded Expenses</span>
             <div className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
@@ -199,19 +202,25 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             </div>
           </div>
           <div>
-            <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              ${(data?.metrics.totalExpenses ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
+            <CountUp
+              to={data?.metrics.totalExpenses ?? 0}
+              decimals={2}
+              prefix="$"
+              separator=","
+              duration={1.25}
+              className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight"
+            />
             <p className="text-[11px] text-slate-400 mt-0.5">
               Across {data?.metrics.expenseCount ?? 0} approved records
             </p>
           </div>
-        </div>
+        </WorkspaceCard>
 
         {/* Awaiting Review */}
-        <div
+        <WorkspaceCard
           onClick={() => onNavigateTab('review')}
-          className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-3 hover:border-amber-500/40 transition-colors cursor-pointer group"
+          spotlightColor="#FFB000"
+          className="space-y-3 cursor-pointer group"
         >
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Awaiting Review</span>
@@ -221,17 +230,19 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           </div>
           <div className="flex items-baseline justify-between">
             <div>
-              <div className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">
-                {data?.metrics.awaitingReview ?? 0}
-              </div>
+              <CountUp
+                to={data?.metrics.awaitingReview ?? 0}
+                duration={1}
+                className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 tracking-tight"
+              />
               <p className="text-[11px] text-slate-400 mt-0.5">Require human verification</p>
             </div>
             <ArrowRight className="size-4 text-slate-400 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
           </div>
-        </div>
+        </WorkspaceCard>
 
         {/* Duplicate Candidates */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-3">
+        <WorkspaceCard spotlightColor="#f43f5e" className="space-y-3">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Duplicate Warnings</span>
             <div className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
@@ -239,18 +250,20 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             </div>
           </div>
           <div>
-            <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {data?.metrics.duplicateCandidates ?? 0}
-            </div>
+            <CountUp
+              to={data?.metrics.duplicateCandidates ?? 0}
+              duration={1}
+              className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight"
+            />
             <p className="text-[11px] text-slate-400 mt-0.5">Hash & metadata collisions</p>
           </div>
-        </div>
+        </WorkspaceCard>
       </div>
 
       {/* Charts Section: Monthly Trend & Spending by Category */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Monthly Spending Trend (2 cols) */}
-        <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs flex flex-col">
+        <WorkspaceCard spotlightColor="#10b981" className="lg:col-span-2 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">Monthly Expense Trend</h3>
@@ -284,10 +297,10 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               </div>
             )}
           </div>
-        </div>
+        </WorkspaceCard>
 
         {/* Category Breakdown (1 col) */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs flex flex-col">
+        <WorkspaceCard spotlightColor="#8b5cf6" className="flex flex-col">
           <div className="mb-4">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">Spending by Category</h3>
             <p className="text-[11px] text-slate-400">Top operational expense distributions</p>
@@ -341,11 +354,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               </div>
             ))}
           </div>
-        </div>
+        </WorkspaceCard>
       </div>
 
       {/* Recent Documents Table & Processing Status */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs space-y-4">
+      <WorkspaceCard spotlightColor="#00D6A0" className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">Recent Documents</h3>
@@ -429,7 +442,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             No recent documents found
           </div>
         )}
-      </div>
+      </WorkspaceCard>
     </div>
   );
 };

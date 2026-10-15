@@ -15,6 +15,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { api } from '../api/client';
+import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
 import type { AutomationRule } from '../types';
 
 export const RulesPage: React.FC = () => {
@@ -211,13 +212,11 @@ export const RulesPage: React.FC = () => {
         /* Rules List */
         <div className="space-y-3">
           {rules.map((rule) => (
-            <div
+            <WorkspaceCard
               key={rule.id}
-              className={`p-5 rounded-2xl border transition-all ${
-                rule.enabled
-                  ? 'bg-white dark:bg-[#0c1813] border-slate-200 dark:border-[#193627] shadow-xs'
-                  : 'bg-slate-50 dark:bg-[#08100c] border-slate-200 dark:border-[#14261c] opacity-65'
-              }`}
+              spotlightColor={rule.enabled ? '#7B35FF' : '#64748b'}
+              surface={rule.enabled ? '#0c1813' : '#08100c'}
+              className={rule.enabled ? '' : 'opacity-65'}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                 <div className="flex items-center gap-3">
@@ -299,7 +298,7 @@ export const RulesPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
+            </WorkspaceCard>
           ))}
 
           {rules.length === 0 && !isLoading && (

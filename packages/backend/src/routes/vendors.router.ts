@@ -49,6 +49,39 @@ router.get('/', (req, res) => {
 });
 
 /**
+ * Create vendor manually
+ */
+router.post('/', (req, res) => {
+  const { name, default_category, tax_id, address, notes, tags } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'Vendor name is required' });
+  }
+
+  const id = ExpenseService.upsertVendor(name.trim(), default_category);
+  const db = getDb();
+
+  if (tax_id || address || notes || tags) {
+    db.prepare(`
+      UPDATE vendors
+      SET tax_id = COALESCE(?, tax_id),
+          address = COALESCE(?, address),
+          notes = COALESCE(?, notes),
+          tags = COALESCE(?, tags),
+          updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE id = ?
+    `).run(
+      tax_id || null,
+      address || null,
+      notes || null,
+      tags ? JSON.stringify(tags) : null,
+      id
+    );
+  }
+
+  res.status(201).json({ success: true, id, message: 'Vendor registered successfully' });
+});
+
+/**
  * Get vendor details by ID including related documents and expenses
  */
 router.get('/:id', (req, res) => {
@@ -149,6 +182,21 @@ router.post('/merge', (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to merge vendors' });
   }
+});
+
+/**
+ * Delete vendor
+ */
+router.delete('/:id', (req, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(id);
+  if (!vendor) {
+    return res.status(404).json({ error: 'Vendor not found' });
+  }
+
+  db.prepare('DELETE FROM vendors WHERE id = ?').run(id);
+  res.json({ success: true, message: 'Vendor removed successfully' });
 });
 
 export default router;

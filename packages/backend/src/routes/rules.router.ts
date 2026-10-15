@@ -2,6 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { getDb } from '../db/index.js';
 import { OllamaService } from '../services/ollama.service.js';
+import { RulesService } from '../services/rules.service.js';
 import { AutomationRuleInputSchema } from '../services/validation.schemas.js';
 
 const router = Router();
@@ -103,6 +104,50 @@ router.delete('/:id', (req, res) => {
 
   db.prepare('DELETE FROM automation_rules WHERE id = ?').run(id);
   res.json({ success: true, message: 'Rule deleted successfully' });
+});
+
+/**
+ * Toggle rule enabled status
+ */
+router.put('/:id/toggle', (req, res) => {
+  const { id } = req.params;
+  const db = getDb();
+  const rule = db.prepare('SELECT enabled FROM automation_rules WHERE id = ?').get(id) as { enabled: number } | undefined;
+  if (!rule) {
+    return res.status(404).json({ error: 'Rule not found' });
+  }
+
+  const newStatus = rule.enabled === 1 ? 0 : 1;
+  db.prepare(`
+    UPDATE automation_rules
+    SET enabled = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    WHERE id = ?
+  `).run(newStatus, id);
+
+  res.json({ success: true, enabled: Boolean(newStatus) });
+});
+
+/**
+ * Test rule matching conditions against sample document data
+ */
+router.post('/test', (req, res) => {
+  const { rule, sampleDocument } = req.body;
+  if (!rule || !sampleDocument) {
+    return res.status(400).json({ error: 'rule and sampleDocument are required' });
+  }
+
+  const matched = RulesService.matchesRule(
+    rule,
+    sampleDocument,
+    sampleDocument.original_filename || '',
+    sampleDocument.extracted_text || ''
+  );
+
+  res.json({
+    success: true,
+    matched,
+    ruleName: rule.name
+  });
 });
 
 /**

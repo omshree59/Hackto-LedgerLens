@@ -14,6 +14,7 @@ import {
   FileText
 } from 'lucide-react';
 import { api } from '../../api/client';
+import { WorkspaceCard } from '../reactbits/WorkspaceCard';
 import type { DocumentItem, DocumentType, DocumentStatus } from '../../types';
 
 interface DocumentTableProps {
@@ -25,6 +26,7 @@ interface DocumentTableProps {
   globalSearch?: string;
   title: string;
   description: string;
+  spotlightColor?: string;
 }
 
 export const DocumentTable: React.FC<DocumentTableProps> = ({
@@ -35,7 +37,8 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   onOpenUpload,
   globalSearch = '',
   title,
-  description
+  description,
+  spotlightColor = '#00D6A0'
 }) => {
   const [items, setItems] = useState<DocumentItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -176,7 +179,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="p-3 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] flex flex-wrap items-center justify-between gap-3 shadow-xs">
+      <WorkspaceCard spotlightColor={spotlightColor} className="!p-3 flex flex-wrap items-center justify-between gap-3">
         {/* Search */}
         <div className="flex-1 min-w-[200px] relative">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -232,7 +235,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
             <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-      </div>
+      </WorkspaceCard>
 
       {/* Bulk Action Bar (when rows are selected) */}
       {selectedIds.length > 0 && (
@@ -274,7 +277,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       )}
 
       {/* Documents Table */}
-      <div className="rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs overflow-hidden">
+      <WorkspaceCard spotlightColor={spotlightColor} className="!p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 dark:bg-[#11241c] text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold border-b border-slate-200 dark:border-[#193627]">
@@ -423,7 +426,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
             </button>
           </div>
         </div>
-      </div>
+      </WorkspaceCard>
     </div>
   );
 };

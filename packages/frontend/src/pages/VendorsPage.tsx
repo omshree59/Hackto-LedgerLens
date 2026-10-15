@@ -14,6 +14,8 @@ import {
   Tag
 } from 'lucide-react';
 import { api } from '../api/client';
+import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
+import CountUp from '../components/reactbits/CountUp';
 import type { VendorItem } from '../types';
 
 interface VendorsPageProps {
@@ -129,10 +131,11 @@ export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSe
       {/* Vendors Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {vendors.map((v) => (
-          <div
+          <WorkspaceCard
             key={v.id}
             onClick={() => openVendorDetail(v.id)}
-            className="p-5 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] hover:border-emerald-500/50 shadow-xs transition-all cursor-pointer space-y-3 group"
+            spotlightColor="#06B6D4"
+            className="cursor-pointer space-y-3 group"
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
@@ -154,9 +157,14 @@ export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSe
             <div className="pt-2 border-t border-slate-100 dark:border-[#152e23] flex items-center justify-between text-xs">
               <div>
                 <span className="text-slate-400 text-[10px] uppercase font-bold block">Lifetime Spend</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">
-                  ${(v.total_spent || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+                <CountUp
+                  to={v.total_spent || 0}
+                  decimals={2}
+                  prefix="$"
+                  separator=","
+                  duration={1}
+                  className="font-mono font-bold text-slate-900 dark:text-white"
+                />
               </div>
               <div className="text-right">
                 <span className="text-slate-400 text-[10px] uppercase font-bold block">Invoices</span>
@@ -171,7 +179,7 @@ export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSe
                 <Calendar className="size-2.5" /> Last active: {v.last_invoice_date}
               </div>
             )}
-          </div>
+          </WorkspaceCard>
         ))}
 
         {vendors.length === 0 && !isLoading && (

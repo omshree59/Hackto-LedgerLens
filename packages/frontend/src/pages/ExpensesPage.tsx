@@ -14,6 +14,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { api } from '../api/client';
+import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
+import CountUp from '../components/reactbits/CountUp';
 import type { ExpenseItem } from '../types';
 
 interface ExpensesPageProps {
@@ -176,25 +178,30 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
       </div>
 
       {/* Summary Stat Card */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/20 to-teal-950/20 border border-emerald-500/20 flex flex-wrap items-center justify-between gap-4">
+      <WorkspaceCard spotlightColor="#059669" className="!p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center">
             <Wallet className="size-5" />
           </div>
           <div>
             <span className="text-[11px] text-slate-400 font-semibold uppercase">Total Filtered Spend</span>
-            <div className="text-xl font-extrabold text-slate-900 dark:text-white font-mono">
-              ${totalSum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
+            <CountUp
+              to={totalSum}
+              decimals={2}
+              prefix="$"
+              separator=","
+              duration={1.15}
+              className="text-xl font-extrabold text-slate-900 dark:text-white font-mono"
+            />
           </div>
         </div>
         <div className="text-xs text-slate-500">
           Showing <span className="font-bold text-slate-800 dark:text-slate-200">{total}</span> recorded transactions
         </div>
-      </div>
+      </WorkspaceCard>
 
       {/* Filter Bar */}
-      <div className="p-3 rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+      <WorkspaceCard spotlightColor="#059669" className="!p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex-1 min-w-[200px] relative">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -238,10 +245,10 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
             title="End date"
           />
         </div>
-      </div>
+      </WorkspaceCard>
 
       {/* Expenses Table */}
-      <div className="rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs overflow-hidden">
+      <WorkspaceCard spotlightColor="#059669" className="!p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 dark:bg-[#11241c] text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200 dark:border-[#193627]">
@@ -342,7 +349,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
             </button>
           </div>
         </div>
-      </div>
+      </WorkspaceCard>
 
       {/* Manual Expense Modal */}
       {isModalOpen && (

@@ -128,7 +128,7 @@ router.post('/', (req, res) => {
 
   ExpenseService.upsertVendor(vendor_name.trim(), category);
 
-  res.status(201).json({ id, message: 'Expense created successfully' });
+  res.status(201).json({ success: true, id, message: 'Expense created successfully' });
 });
 
 /**

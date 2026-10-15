@@ -20,6 +20,7 @@ export const ReceiptsPage: React.FC<ReceiptsPageProps> = ({
       onOpenReview={onOpenReview}
       onOpenUpload={onOpenUpload}
       globalSearch={globalSearch}
+      spotlightColor="#3185FF"
     />
   );
 };
