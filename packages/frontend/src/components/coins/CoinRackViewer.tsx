@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { NavItem, OllamaStatus } from '../../types';
+import { COIN_FEATURES, type CoinFeature } from './coinData';
 import {
   Play,
   Pause,
@@ -15,11 +17,56 @@ import {
   Command,
   HelpCircle,
   Eye,
-  Activity
+  Activity,
+  Compass,
+  Maximize2,
+  Video,
+  Layers,
+  Camera
 } from 'lucide-react';
-import { COIN_FEATURES, type CoinFeature } from './coinData';
 
 export { COIN_FEATURES, type CoinFeature };
+
+export type CameraPreset = 'cinematic' | 'front' | 'top' | 'isometric';
+
+interface CameraPresetConfig {
+  id: CameraPreset;
+  label: string;
+  icon: string;
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+}
+
+const CAMERA_PRESETS: CameraPresetConfig[] = [
+  {
+    id: 'cinematic',
+    label: 'Cinematic',
+    icon: '🎬',
+    position: new THREE.Vector3(-2.0, 3.2, 9.2),
+    target: new THREE.Vector3(0, 0.75, -0.4)
+  },
+  {
+    id: 'front',
+    label: 'Front',
+    icon: '👁',
+    position: new THREE.Vector3(0, 1.3, 8.8),
+    target: new THREE.Vector3(0, 0.75, 0)
+  },
+  {
+    id: 'top',
+    label: 'Top',
+    icon: '⬇',
+    position: new THREE.Vector3(0, 11.2, 0.05),
+    target: new THREE.Vector3(0, 0.75, 0)
+  },
+  {
+    id: 'isometric',
+    label: 'Isometric',
+    icon: '📐',
+    position: new THREE.Vector3(7.8, 6.2, 7.8),
+    target: new THREE.Vector3(0, 0.75, 0)
+  }
+];
 
 interface CoinRackViewerProps {
   currentTab: NavItem;
@@ -42,18 +89,17 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Discrete React state ONLY for UI overlays and accessibility
+  // Discrete React state for UI overlays ONLY
   const [isPlaying, setIsPlaying] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
   const [activeUiIndex, setActiveUiIndex] = useState(() => {
     const idx = COIN_FEATURES.findIndex(f => f.id === currentTab);
     return idx !== -1 ? idx : 0;
   });
-
-  // Performance FPS display
+  const [activePreset, setActivePreset] = useState<CameraPreset | 'custom'>('cinematic');
   const [currentFps, setCurrentFps] = useState(60);
 
-  // Mutable animation state in REFS (zero React re-renders during high-frequency interactions!)
+  // Mutable refs for 60fps animations
   const isPlayingRef = useRef(true);
   isPlayingRef.current = isPlaying;
 
@@ -74,28 +120,27 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
   const initialTabIdx = COIN_FEATURES.findIndex(f => f.id === currentTab);
   const currentPosRef = useRef<number>(initialTabIdx !== -1 ? initialTabIdx : 0);
   const targetPosRef = useRef<number>(initialTabIdx !== -1 ? initialTabIdx : 0);
-  const velocityRef = useRef<number>(0);
 
   // Pointer & Raycasting state in REFS
   const pointerNormRef = useRef<{ x: number; y: number }>({ x: -999, y: -999 });
   const isPointerInsideRef = useRef(false);
   const hoveredCoinIndexRef = useRef<number | null>(null);
-  const isDraggingRef = useRef(false);
-  const dragStartXRef = useRef(0);
-  const dragStartPosRef = useRef(0);
-  const dragLastTimeRef = useRef(0);
-  const dragVelocityRef = useRef(0);
 
   // Coin selection & pickup animation state
   const pickingUpIdRef = useRef<string | null>(null);
   const pickingUpProgressRef = useRef(0);
 
+  // Camera presets animation state in REFS
+  const targetCamPosRef = useRef<THREE.Vector3 | null>(null);
+  const targetCamLookRef = useRef<THREE.Vector3 | null>(null);
+  const isTransitioningCameraRef = useRef(false);
+
   // Three.js instances stored in refs
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
   const animFrameRef = useRef<number | null>(null);
-  const camLookAtXRef = useRef<number>(0);
   const activeSpotlightRef = useRef<THREE.PointLight | null>(null);
 
   // Array of coin items with direct mesh handles
@@ -109,7 +154,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     baseX: number;
   }>>([]);
 
-  // Sync target pos if currentTab changes from parent
+  // Sync target pos if currentTab changes externally
   useEffect(() => {
     const idx = COIN_FEATURES.findIndex(f => f.id === currentTab);
     if (idx !== -1) {
@@ -131,6 +176,35 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     }, 400);
   }, []);
 
+  // Camera preset activator with frame-rate independent interpolation
+  const activatePreset = useCallback((presetId: CameraPreset) => {
+    const preset = CAMERA_PRESETS.find(p => p.id === presetId);
+    if (!preset || !cameraRef.current || !controlsRef.current) return;
+
+    setActivePreset(presetId);
+    targetCamPosRef.current = preset.position.clone();
+    targetCamLookRef.current = preset.target.clone();
+    isTransitioningCameraRef.current = true;
+  }, []);
+
+  // Reset camera view to default cinematic
+  const resetCamera = useCallback(() => {
+    activatePreset('cinematic');
+  }, [activatePreset]);
+
+  // Focus camera directly onto a specific coin (e.g. double-click)
+  const focusCoinCamera = useCallback((coinIndex: number) => {
+    if (!cameraRef.current || !controlsRef.current) return;
+    const posX = START_X + coinIndex * SPACING;
+    const targetLook = new THREE.Vector3(posX, 0.9, 0);
+    const targetPos = new THREE.Vector3(posX - 0.5, 2.0, 5.2);
+
+    targetCamPosRef.current = targetPos;
+    targetCamLookRef.current = targetLook;
+    isTransitioningCameraRef.current = true;
+    setActivePreset('custom');
+  }, [SPACING, START_X]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -147,6 +221,16 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         if (feature && !removedCoinsRef.current.has(feature.id)) {
           triggerCoinSelection(feature.id);
         }
+      } else if (e.key === '1') {
+        activatePreset('cinematic');
+      } else if (e.key === '2') {
+        activatePreset('front');
+      } else if (e.key === '3') {
+        activatePreset('top');
+      } else if (e.key === '4') {
+        activatePreset('isometric');
+      } else if (e.key === 'r' && !e.altKey) {
+        resetCamera();
       } else if (e.key === 'r' && e.altKey) {
         onRestoreCoins();
       }
@@ -154,9 +238,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [TOTAL_COINS, onRestoreCoins, triggerCoinSelection]);
+  }, [TOTAL_COINS, activatePreset, onRestoreCoins, resetCamera, triggerCoinSelection]);
 
-  // Helper to pre-render coin face texture once
+  // Front face canvas texture (pre-rendered once)
   const createCoinFaceTexture = useCallback((feature: CoinFeature): THREE.CanvasTexture => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -209,7 +293,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     ctx.fillStyle = feature.color;
     ctx.fillText(feature.badgeIcon, 256, 170);
 
-    // Primary Name (embossed, clean)
+    // Primary Name
     const fontSize = feature.name.length > 11 ? 40 : 48;
     ctx.font = `bold ${fontSize}px "Plus Jakarta Sans", -apple-system, sans-serif`;
     ctx.fillStyle = feature.textColor;
@@ -222,6 +306,81 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     ctx.font = '600 20px "Plus Jakarta Sans", sans-serif';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.fillText(feature.subtext, 256, 320);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    return texture;
+  }, []);
+
+  // Back face canvas texture (official LedgerLens collectible emblem from all 360° angles!)
+  const createCoinBackFaceTexture = useCallback((feature: CoinFeature): THREE.CanvasTexture => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+
+    // 1. Dark circular face background
+    ctx.fillStyle = feature.faceColor;
+    ctx.beginPath();
+    ctx.arc(256, 256, 252, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Outer polished metallic border rim ring
+    ctx.lineWidth = 24;
+    ctx.strokeStyle = feature.color;
+    ctx.stroke();
+
+    // 3. Inner concentric groove ring
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.beginPath();
+    ctx.arc(256, 256, 226, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Decorative dashed ring
+    ctx.setLineDash([8, 8]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.arc(256, 256, 204, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Radial metallic sheen
+    const grad = ctx.createRadialGradient(256, 256, 20, 256, 256, 224);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+    grad.addColorStop(0.7, 'rgba(0, 0, 0, 0.3)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.75)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(256, 256, 222, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Center LedgerLens Emblem
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Diamond Logo
+    ctx.font = 'bold 54px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = feature.color;
+    ctx.fillText('◈', 256, 175);
+
+    // Brand Name
+    ctx.font = 'bold 36px "Plus Jakarta Sans", -apple-system, sans-serif';
+    ctx.fillStyle = feature.textColor;
+    ctx.fillText('LEDGERLENS', 256, 240);
+
+    // Subtext
+    ctx.font = 'bold 18px "Plus Jakarta Sans", sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.fillText('PRIVATE AI ENGINE', 256, 288);
+
+    // Feature Token Tag
+    ctx.font = '600 15px monospace';
+    ctx.fillStyle = feature.color;
+    ctx.fillText(`TOKEN #${feature.id.toUpperCase()}`, 256, 332);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -269,12 +428,12 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     scene.background = new THREE.Color(0x050a0b); // #050A0B
-    scene.fog = new THREE.FogExp2(0x050a0b, 0.026);
+    scene.fog = new THREE.FogExp2(0x050a0b, 0.024);
 
     // 2. Camera
-    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 80);
+    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 90);
     camera.position.set(-2.0, 3.2, 9.2);
-    camera.lookAt(0.5, 0.8, -0.4);
+    camera.lookAt(0, 0.75, -0.4);
     cameraRef.current = camera;
 
     // 3. WebGL Renderer with performance-capped DPR
@@ -285,7 +444,6 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       stencil: false,
       depth: true
     });
-    // Target DPR: capped at 1.5 to prevent GPU fill-rate throttling on Retina screens
     const targetPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     renderer.setSize(width, height);
     renderer.setPixelRatio(targetPixelRatio);
@@ -297,27 +455,62 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     container.appendChild(renderer.domElement);
 
-    // 4. Lights
+    // 4. OrbitControls: Full 360° Interactive Camera System
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 3.5;
+    controls.maxDistance = 25.0;
+    // Keep camera above floor plane to prevent ground clipping
+    controls.maxPolarAngle = Math.PI / 2 - 0.03;
+    controls.minPolarAngle = 0.08; // Can view looking down from top
+    controls.target.set(0, 0.75, 0);
+    // Smooth touch controls
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN
+    };
+
+    // When user manually manipulates camera, cancel preset animation & update active state
+    controls.addEventListener('start', () => {
+      isTransitioningCameraRef.current = false;
+      setActivePreset('custom');
+    });
+
+    controlsRef.current = controls;
+
+    // 5. Complete 360° Lighting (Front, Rear, Top, Rim)
     const ambientLight = new THREE.AmbientLight(0x0b1714, 2.2);
     scene.add(ambientLight);
 
+    // Front Key Light
     const mainKeyLight = new THREE.DirectionalLight(0xffffff, 3.2);
     mainKeyLight.position.set(6, 14, 9);
     mainKeyLight.castShadow = true;
     mainKeyLight.shadow.mapSize.width = 1024;
     mainKeyLight.shadow.mapSize.height = 1024;
     mainKeyLight.shadow.camera.near = 0.5;
-    mainKeyLight.shadow.camera.far = 28;
+    mainKeyLight.shadow.camera.far = 30;
     mainKeyLight.shadow.bias = -0.0005;
     scene.add(mainKeyLight);
 
+    // Teal Front-Left Backlight
     const tealBackLight = new THREE.DirectionalLight(0x00d6a0, 2.6);
     tealBackLight.position.set(-12, 5, -8);
     scene.add(tealBackLight);
 
+    // Violet Front-Right Fill Light
     const violetFillLight = new THREE.DirectionalLight(0xb45bff, 2.0);
     violetFillLight.position.set(10, -3, 6);
     scene.add(violetFillLight);
+
+    // Rear Specular Key Light (Illuminates coins and back-pedestals when orbiting 360°)
+    const rearKeyLight = new THREE.DirectionalLight(0x7090b0, 2.2);
+    rearKeyLight.position.set(0, 10, -12);
+    rearKeyLight.castShadow = true;
+    rearKeyLight.shadow.mapSize.width = 1024;
+    rearKeyLight.shadow.mapSize.height = 1024;
+    scene.add(rearKeyLight);
 
     // Dynamic spotlight tracking focused coin
     const activeSpotlight = new THREE.PointLight(0x00d6a0, 4.2, 7, 1.2);
@@ -345,7 +538,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    // 5. Shared Geometries (REUSED FOR ALL COINS & SLOTS - NO DUPLICATE MEMORY ALLOCATION!)
+    // 6. Shared Geometries
     const coinGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.25, 48);
     const pedestalGeo = new THREE.BoxGeometry(1.6, 0.9, 2.1);
     const grooveGeo = new THREE.BoxGeometry(0.38, 0.32, 1.7);
@@ -366,7 +559,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       roughness: 0.95
     });
 
-    // 6. Conveyor Group
+    // 7. Conveyor Group
     const coinsGroup = new THREE.Group();
     coinsGroup.rotation.y = 0.26;
     coinsGroup.rotation.x = 0.035;
@@ -386,12 +579,18 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     rackBaseMesh.receiveShadow = true;
     coinsGroup.add(rackBaseMesh);
 
-    // Edge neon wire on the rail
+    // Front edge neon wire (teal)
     const edgeNeonGeo = new THREE.BoxGeometry(TOTAL_WIDTH + 8, 0.05, 0.05);
     const edgeNeonMat = new THREE.MeshBasicMaterial({ color: 0x00d6a0 });
     const edgeNeonMesh = new THREE.Mesh(edgeNeonGeo, edgeNeonMat);
     edgeNeonMesh.position.set(0, -0.16, 1.4);
     coinsGroup.add(edgeNeonMesh);
+
+    // Rear edge neon wire (electric violet)
+    const rearNeonMat = new THREE.MeshBasicMaterial({ color: 0xb45bff });
+    const rearNeonMesh = new THREE.Mesh(edgeNeonGeo, rearNeonMat);
+    rearNeonMesh.position.set(0, -0.16, -1.4);
+    coinsGroup.add(rearNeonMesh);
 
     // Build the 10 slots & coins
     const items: Array<{
@@ -422,11 +621,16 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       grooveMesh.position.set(0, 0.38, 0);
       pedestalGroup.add(grooveMesh);
 
-      // LED indicator
+      // Front LED indicator
       const ledMat = new THREE.MeshBasicMaterial({ color: feature.ledColor });
       const ledMesh = new THREE.Mesh(ledGeo, ledMat);
       ledMesh.position.set(0, -0.08, 1.06);
       pedestalGroup.add(ledMesh);
+
+      // Rear LED indicator (visible when orbiting behind)
+      const rearLedMesh = new THREE.Mesh(ledGeo, ledMat);
+      rearLedMesh.position.set(0, -0.08, -1.06);
+      pedestalGroup.add(rearLedMesh);
 
       // Vertical light streak
       const streakCanvas = document.createElement('canvas');
@@ -468,7 +672,8 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       const coinGroup = new THREE.Group();
       coinGroup.position.set(posX, 0.7, 0);
 
-      const faceTex = createCoinFaceTexture(feature);
+      const frontFaceTex = createCoinFaceTexture(feature);
+      const backFaceTex = createCoinBackFaceTexture(feature);
 
       // Fluted edge material
       const edgeMat = new THREE.MeshStandardMaterial({
@@ -479,14 +684,22 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         bumpScale: 0.09
       });
 
-      // Front & back face materials
-      const faceMat = new THREE.MeshStandardMaterial({
-        map: faceTex,
+      // Front face material
+      const frontFaceMat = new THREE.MeshStandardMaterial({
+        map: frontFaceTex,
         metalness: 0.48,
         roughness: 0.28
       });
 
-      const coinMesh = new THREE.Mesh(coinGeo, [edgeMat, faceMat, faceMat]);
+      // Back face material
+      const backFaceMat = new THREE.MeshStandardMaterial({
+        map: backFaceTex,
+        metalness: 0.52,
+        roughness: 0.25
+      });
+
+      // CylinderGeometry: [0]: side rim, [1]: top/front cap, [2]: bottom/back cap
+      const coinMesh = new THREE.Mesh(coinGeo, [edgeMat, frontFaceMat, backFaceMat]);
       coinMesh.rotation.x = Math.PI / 2; // Upright
       coinMesh.castShadow = true;
       coinMesh.receiveShadow = true;
@@ -534,78 +747,75 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     coinItemsRef.current = items;
 
-    // 7. Raycaster instance created once
+    // 8. Raycaster & Pointer Interaction with Strict Click-vs-Drag Discrimination
     const raycaster = new THREE.Raycaster();
     const mouseVector = new THREE.Vector2();
 
-    // =========================================================================
-    // EVENT LISTENERS (LIGHTWEIGHT, REACTIONARY, ZERO STATE RERENDERS)
-    // =========================================================================
     const dom = renderer.domElement;
 
-    // Wheel Scroll with frame-rate independent velocity damping
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
+    // Track click vs drag parameters
+    let pointerDownTime = 0;
+    let pointerDownX = 0;
+    let pointerDownY = 0;
+    let pointerDownHitCoin: CoinFeature | null = null;
+    let pointerDownHitIndex: number | null = null;
 
-      // Normalize delta across line vs pixel vs trackpad
-      let delta = e.deltaY;
-      if (Math.abs(delta) < 0.1 && Math.abs(e.deltaX) > 0.1) {
-        delta = e.deltaX;
-      }
-      if (e.deltaMode === 1) delta *= 32; // lines
-      else if (e.deltaMode === 2) delta *= 800; // pages
-
-      // Clamp excessive deltas from violent trackpad flicks
-      const clampedDelta = Math.max(-100, Math.min(100, delta));
-      const sensitivity = 0.0032;
-
-      // Add to target position with instant reversal response
-      targetPosRef.current = Math.max(0, Math.min(TOTAL_COINS - 1, targetPosRef.current + clampedDelta * sensitivity));
-    };
-
-    // Pointer Down (Drag or Click)
     const handlePointerDown = (e: PointerEvent) => {
-      isDraggingRef.current = true;
-      dragStartXRef.current = e.clientX;
-      dragStartPosRef.current = targetPosRef.current;
-      dragLastTimeRef.current = performance.now();
-      dragVelocityRef.current = 0;
+      pointerDownTime = performance.now();
+      pointerDownX = e.clientX;
+      pointerDownY = e.clientY;
 
-      // Raycast click
-      if (hoveredCoinIndexRef.current !== null) {
-        const feat = COIN_FEATURES[hoveredCoinIndexRef.current];
-        if (feat && !removedCoinsRef.current.has(feat.id)) {
-          triggerCoinSelection(feat.id);
-        }
+      const rect = dom.getBoundingClientRect();
+      mouseVector.set(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      raycaster.setFromCamera(mouseVector, camera);
+      const intersects = raycaster.intersectObjects(interactiveCoins, false);
+      if (intersects.length > 0) {
+        pointerDownHitCoin = intersects[0].object.userData.feature as CoinFeature;
+        pointerDownHitIndex = intersects[0].object.userData.index as number;
+      } else {
+        pointerDownHitCoin = null;
+        pointerDownHitIndex = null;
       }
     };
 
-    // Pointer Move: update coordinates in refs only (ZERO React overhead!)
     const handlePointerMove = (e: PointerEvent) => {
       const rect = dom.getBoundingClientRect();
       pointerNormRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointerNormRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       isPointerInsideRef.current = true;
-
-      // Drag translation
-      if (isDraggingRef.current) {
-        const deltaX = e.clientX - dragStartXRef.current;
-        const now = performance.now();
-        const dt = Math.max(1, now - dragLastTimeRef.current);
-        dragVelocityRef.current = -deltaX / dt;
-        dragLastTimeRef.current = now;
-
-        // Diagonal sensitivity
-        const dragFactor = 0.0045;
-        targetPosRef.current = Math.max(0, Math.min(TOTAL_COINS - 1, dragStartPosRef.current - deltaX * dragFactor));
-      }
     };
 
-    const handlePointerUp = () => {
-      if (isDraggingRef.current) {
-        isDraggingRef.current = false;
-        // Snap smoothly to nearest integer coin slot upon drag release
-        targetPosRef.current = Math.max(0, Math.min(TOTAL_COINS - 1, Math.round(targetPosRef.current)));
+    const handlePointerUp = (e: PointerEvent) => {
+      const dist = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
+      const duration = performance.now() - pointerDownTime;
+
+      // Strict Click Discrimination: movement must be under 6 pixels and under 550ms
+      if (dist < 6 && duration < 550 && pointerDownHitCoin) {
+        // Legitimate intentional single CLICK on a coin!
+        if (!removedCoinsRef.current.has(pointerDownHitCoin.id)) {
+          triggerCoinSelection(pointerDownHitCoin.id);
+        }
+      }
+      pointerDownHitCoin = null;
+      pointerDownHitIndex = null;
+    };
+
+    // Double-click: focus camera on clicked coin!
+    const handleDblClick = (e: MouseEvent) => {
+      const rect = dom.getBoundingClientRect();
+      mouseVector.set(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      raycaster.setFromCamera(mouseVector, camera);
+      const intersects = raycaster.intersectObjects(interactiveCoins, false);
+      if (intersects.length > 0) {
+        const hitIdx = intersects[0].object.userData.index as number;
+        focusCoinCamera(hitIdx);
+        targetPosRef.current = hitIdx;
       }
     };
 
@@ -615,15 +825,14 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       dom.style.cursor = 'default';
     };
 
-    // Attach listeners
-    dom.addEventListener('wheel', handleWheel, { passive: false });
     dom.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
     window.addEventListener('pointerup', handlePointerUp);
+    dom.addEventListener('dblclick', handleDblClick);
     dom.addEventListener('pointerleave', handlePointerLeave);
 
     // =========================================================================
-    // 8. MASTER ANIMATION LOOP (LOCKED 60 FPS, FRAME-INDEPENDENT DAMPING)
+    // 9. MASTER ANIMATION LOOP (LOCKED 60 FPS, FRAME-INDEPENDENT DAMPING)
     // =========================================================================
     let clock = new THREE.Clock();
     let frameCounter = 0;
@@ -633,10 +842,10 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     const animate = () => {
       animFrameRef.current = requestAnimationFrame(animate);
 
-      const delta = Math.min(clock.getDelta(), 0.1); // Clamp to prevent spiral of death
+      const delta = Math.min(clock.getDelta(), 0.1);
       const elapsedTime = clock.getElapsedTime();
 
-      // FPS Monitoring (adaptive performance guard)
+      // FPS Monitoring
       frameCounter++;
       fpsTimeAccum += delta;
       if (fpsTimeAccum >= 1.0) {
@@ -645,7 +854,6 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         frameCounter = 0;
         fpsTimeAccum = 0;
 
-        // Adaptive quality: lower DPR if sustained frame drops occur
         if (measuredFps < 48 && renderer.getPixelRatio() > 1.0) {
           renderer.setPixelRatio(1.0);
         } else if (measuredFps > 58 && renderer.getPixelRatio() < targetPixelRatio) {
@@ -653,11 +861,28 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         }
       }
 
-      // --- 1. Conveyor Smooth Damping (Frame-rate Independent) ---
+      // --- 1. Camera Preset Interpolation ---
+      if (isTransitioningCameraRef.current && targetCamPosRef.current && targetCamLookRef.current) {
+        const camLerpAlpha = 1.0 - Math.exp(-8.0 * delta);
+        camera.position.lerp(targetCamPosRef.current, camLerpAlpha);
+        controls.target.lerp(targetCamLookRef.current, camLerpAlpha);
+
+        if (
+          camera.position.distanceTo(targetCamPosRef.current) < 0.05 &&
+          controls.target.distanceTo(targetCamLookRef.current) < 0.05
+        ) {
+          camera.position.copy(targetCamPosRef.current);
+          controls.target.copy(targetCamLookRef.current);
+          isTransitioningCameraRef.current = false;
+        }
+      }
+
+      // Update OrbitControls
+      controls.update();
+
+      // --- 2. Conveyor Smooth Damping ---
       const targetPos = targetPosRef.current;
-      // Exponential decay: responsive yet butter-smooth
-      const dampingSpeed = isDraggingRef.current ? 24.0 : 12.0;
-      const alpha = 1.0 - Math.exp(-dampingSpeed * delta);
+      const alpha = 1.0 - Math.exp(-12.0 * delta);
       currentPosRef.current += (targetPos - currentPosRef.current) * alpha;
 
       const currentPos = currentPosRef.current;
@@ -669,17 +894,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         setActiveUiIndex(roundedIndex);
       }
 
-      // --- 2. Camera Tracking along Conveyor Diagonal ---
-      const focusX = START_X + currentPos * SPACING;
-      const targetCamX = -2.0 + focusX * 0.85;
-      camera.position.x += (targetCamX - camera.position.x) * (1.0 - Math.exp(-10.0 * delta));
-
-      const targetLookX = focusX * 0.9;
-      camLookAtXRef.current += (targetLookX - camLookAtXRef.current) * (1.0 - Math.exp(-10.0 * delta));
-      camera.lookAt(camLookAtXRef.current, 0.85, -0.4);
-
       // --- 3. Dynamic Spotlight Tracking ---
       if (activeSpotlightRef.current) {
+        const focusX = START_X + currentPos * SPACING;
         const activeColor = new THREE.Color(COIN_FEATURES[roundedIndex].color);
         activeSpotlightRef.current.color.lerp(activeColor, 0.15);
         activeSpotlightRef.current.position.x += (focusX - activeSpotlightRef.current.position.x) * (1.0 - Math.exp(-14.0 * delta));
@@ -689,7 +906,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       particles.rotation.y = elapsedTime * 0.02;
 
       // --- 5. Optimized Raycasting (Once per frame, only interactive coins) ---
-      if (isPointerInsideRef.current && !isDraggingRef.current) {
+      if (isPointerInsideRef.current) {
         mouseVector.set(pointerNormRef.current.x, pointerNormRef.current.y);
         raycaster.setFromCamera(mouseVector, camera);
         const intersects = raycaster.intersectObjects(interactiveCoins, false);
@@ -710,7 +927,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         }
       }
 
-      // --- 6. Transform Every Coin (High-Performance Direct Transforms) ---
+      // --- 6. Transform Every Coin ---
       const isPlayingLoop = isPlayingRef.current;
       const pickingUpId = pickingUpIdRef.current;
       const removedCoinsSet = removedCoinsRef.current;
@@ -722,11 +939,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
         // Continuous distance from floating conveyor cursor
         const distFromFocus = Math.abs(currentPos - index);
-        // Continuous proximity bell-curve: 1.0 when perfectly focused, 0.0 when 1.5 slots away
         const proximity = Math.max(0, 1.0 - distFromFocus * 0.8);
 
         if (isRemoved && !isBeingPickedUp) {
-          // Absent: hide mesh, show faint glowing empty slot
           group.visible = false;
           (emptyGlowMesh.material as THREE.MeshBasicMaterial).opacity = 0.35;
           return;
@@ -739,7 +954,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         let targetY = 0.65;
         if (isBeingPickedUp) {
           pickingUpProgressRef.current = Math.min(1.0, pickingUpProgressRef.current + delta * 2.5);
-          targetY = 0.65 + pickingUpProgressRef.current * 2.5; // Elevate high up
+          targetY = 0.65 + pickingUpProgressRef.current * 2.5;
         } else {
           targetY = 0.65 + proximity * 0.95 + (isHovered ? 0.35 : 0.0);
         }
@@ -761,7 +976,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         if (isBeingPickedUp) {
           targetRotX = -0.3;
           targetScale = 1.0 + pickingUpProgressRef.current * 0.25;
-          group.rotation.y += delta * 6.0; // Fast dramatic spin
+          group.rotation.y += delta * 6.0;
         }
 
         group.rotation.x += (targetRotX - group.rotation.x) * (1.0 - Math.exp(-12.0 * delta));
@@ -780,7 +995,6 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     animate();
 
-    // Window resize handler
     const handleResize = () => {
       if (!container || !renderer || !camera) return;
       const newW = container.clientWidth;
@@ -792,20 +1006,18 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     window.addEventListener('resize', handleResize);
 
-    // =========================================================================
-    // CLEANUP ON UNMOUNT (GENUINE UNMOUNT ONLY)
-    // =========================================================================
     return () => {
       window.removeEventListener('resize', handleResize);
-      dom.removeEventListener('wheel', handleWheel);
       dom.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      dom.removeEventListener('dblclick', handleDblClick);
       dom.removeEventListener('pointerleave', handlePointerLeave);
 
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
 
-      // Clean disposal
+      controls.dispose();
+
       coinGeo.dispose();
       pedestalGeo.dispose();
       grooveGeo.dispose();
@@ -822,7 +1034,14 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       }
       renderer.dispose();
     };
-  }, [TOTAL_COINS, createCoinFaceTexture, sharedReededBump, triggerCoinSelection]);
+  }, [
+    TOTAL_COINS,
+    createCoinBackFaceTexture,
+    createCoinFaceTexture,
+    focusCoinCamera,
+    sharedReededBump,
+    triggerCoinSelection
+  ]);
 
   const activeFeature = COIN_FEATURES[activeUiIndex] || COIN_FEATURES[0];
 
@@ -882,8 +1101,8 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
           )}
         </div>
 
-        {/* Right Top Actions */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+        {/* Right Top Actions & 360° Camera Preset Pills */}
+        <div className="flex items-center gap-2.5 pointer-events-auto">
           {/* Quick Upload CTA */}
           <button
             onClick={onOpenUpload}
@@ -902,16 +1121,57 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
             {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
           </button>
 
-          {/* Keyboard Help */}
+          {/* Keyboard & Controls Help */}
           <button
             onClick={() => setShowHelp(h => !h)}
             className="p-2 rounded-xl bg-[#0b1714]/80 hover:bg-[#122822] border border-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Interactive Controls"
+            title="360° Orbit & Camera Controls"
           >
             <HelpCircle className="size-4" />
           </button>
         </div>
       </header>
+
+      {/* Floating 360° Camera Preset HUD (Top Right Sub-bar) */}
+      <div className="absolute top-20 right-6 z-20 pointer-events-none hidden sm:flex items-center gap-1.5 p-1.5 rounded-2xl bg-[#0b1714]/85 backdrop-blur-xl border border-slate-800/80 shadow-2xl">
+        <div className="flex items-center gap-1.5 px-2 text-[11px] font-mono font-bold text-slate-400">
+          <Camera className="size-3.5 text-emerald-400" />
+          <span>Camera:</span>
+        </div>
+
+        {CAMERA_PRESETS.map(preset => {
+          const isActive = activePreset === preset.id;
+          return (
+            <button
+              key={preset.id}
+              onClick={() => activatePreset(preset.id)}
+              className={`pointer-events-auto px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+              title={`Switch to ${preset.label} Camera View`}
+            >
+              <span>{preset.icon}</span>
+              <span>{preset.label}</span>
+            </button>
+          );
+        })}
+
+        <button
+          onClick={resetCamera}
+          className="pointer-events-auto px-2 py-1 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer ml-1"
+          title="Reset Camera (R key)"
+        >
+          <RotateCcw className="size-3" />
+        </button>
+      </div>
+
+      {/* Subtle Hint: 360° Orbit Guidance */}
+      <div className="absolute top-20 left-6 z-20 pointer-events-none hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0b1714]/75 backdrop-blur-md border border-slate-800/80 text-[11px] text-slate-400 font-mono">
+        <Compass className="size-3.5 text-emerald-400 animate-spin-slow" />
+        <span>Left Drag: 360° Orbit • Wheel: Zoom • Right Drag: Pan • Click: Open</span>
+      </div>
 
       {/* 3. 3D WebGL Canvas */}
       <div
@@ -1040,8 +1300,8 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
           <div className="bg-[#0b1714] border border-slate-800 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Command className="size-4 text-emerald-400" />
-                3D Conveyor Navigation
+                <Compass className="size-4 text-emerald-400" />
+                360° Orbit & Camera Controls
               </h3>
               <button
                 onClick={() => setShowHelp(false)}
@@ -1051,26 +1311,38 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-300">
+            <div className="space-y-2.5 text-xs text-slate-300">
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
-                <span className="text-slate-400">Navigate between coins</span>
-                <span className="font-mono text-emerald-400 font-bold">← / → or A / D</span>
+                <span className="text-slate-400">Orbit camera 360°</span>
+                <span className="font-mono text-emerald-400 font-bold">Left Drag</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
+                <span className="text-slate-400">Zoom in / out</span>
+                <span className="font-mono text-emerald-400 font-bold">Mouse Wheel / Pinch</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
+                <span className="text-slate-400">Pan camera</span>
+                <span className="font-mono text-emerald-400 font-bold">Right Drag / 2-finger</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
+                <span className="text-slate-400">Focus camera on coin</span>
+                <span className="font-mono text-emerald-400 font-bold">Double Click</span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
                 <span className="text-slate-400">Pick up & open workspace</span>
-                <span className="font-mono text-emerald-400 font-bold">Enter / Space / Click</span>
+                <span className="font-mono text-emerald-400 font-bold">Single Click / Enter</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
+                <span className="text-slate-400">Camera Presets</span>
+                <span className="font-mono text-emerald-400 font-bold">Keys 1, 2, 3, 4</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
+                <span className="text-slate-400">Reset Camera</span>
+                <span className="font-mono text-emerald-400 font-bold">Key R</span>
               </div>
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
                 <span className="text-slate-400">Slide conveyor rack</span>
-                <span className="font-mono text-emerald-400 font-bold">Drag / Mouse Wheel</span>
-              </div>
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
-                <span className="text-slate-400">Return to conveyor</span>
-                <span className="font-mono text-emerald-400 font-bold">Esc</span>
-              </div>
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#071310] border border-slate-800">
-                <span className="text-slate-400">Restore removed coins</span>
-                <span className="font-mono text-emerald-400 font-bold">Alt + R</span>
+                <span className="font-mono text-emerald-400 font-bold">← / → or A / D</span>
               </div>
             </div>
 
