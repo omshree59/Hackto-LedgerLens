@@ -1,0 +1,11 @@
+node_modules/
+dist/
+data/uploads/*
+!data/uploads/.gitkeep
+data/exports/*
+!data/exports/.gitkeep
+data/*.sqlite*
+.env
+*.log
+eng.traineddata
+.DS_Store
