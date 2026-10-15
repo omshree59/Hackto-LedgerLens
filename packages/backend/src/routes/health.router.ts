@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { OllamaService } from '../services/ollama.service.js';
 import { getDb } from '../db/index.js';
+import { CONFIG } from '../config.js';
 
 const router = Router();
 
@@ -49,6 +50,51 @@ router.post('/ollama/set-model', (req, res) => {
   `).run(model.trim());
 
   res.json({ success: true, selectedModel: model.trim() });
+});
+
+router.post('/ollama/test-prompt', async (req, res) => {
+  const { prompt = 'Say hello and confirm you are the local Gemma engine.', model, temperature = 0.1 } = req.body;
+  const targetModel = model || OllamaService.getActiveModel();
+  const startTime = Date.now();
+
+  try {
+    const response = await fetch(`${CONFIG.OLLAMA_BASE_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: targetModel,
+        prompt,
+        stream: false,
+        options: { temperature: parseFloat(String(temperature)) || 0.1 }
+      })
+    });
+
+    const elapsedMs = Date.now() - startTime;
+
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(response.status).json({
+        error: `Ollama returned ${response.status}: ${errText}`,
+        latencyMs: elapsedMs
+      });
+    }
+
+    const data = await response.json() as any;
+    res.json({
+      success: true,
+      model: targetModel,
+      response: data.response,
+      latencyMs: elapsedMs,
+      totalDurationNs: data.total_duration,
+      evalCount: data.eval_count,
+      evalDurationNs: data.eval_duration
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      error: err.message || 'Failed to communicate with local Ollama service',
+      latencyMs: Date.now() - startTime
+    });
+  }
 });
 
 export default router;

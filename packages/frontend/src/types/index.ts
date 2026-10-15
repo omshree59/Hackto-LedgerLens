@@ -191,3 +191,17 @@ export interface OllamaStatus {
   modelFound: boolean;
   error?: string;
 }
+
+export type FeatureCoinId =
+  | 'overview'
+  | 'invoices'
+  | 'receipts'
+  | 'review'
+  | 'vendors'
+  | 'expenses'
+  | 'rules'
+  | 'reports'
+  | 'local_ai'
+  | 'settings';
+
+export type NavItem = FeatureCoinId;

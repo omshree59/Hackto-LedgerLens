@@ -47,6 +47,17 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ model })
   }),
+  testPrompt: (prompt: string, model?: string, temperature?: number) => request<{
+    success: boolean;
+    model: string;
+    response: string;
+    latencyMs: number;
+    evalCount?: number;
+    evalDurationNs?: number;
+  }>('/ollama/test-prompt', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, model, temperature })
+  }),
 
   // Documents
   uploadDocuments: (files: File[], documentType?: string) => {

@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Sidebar, type NavItem } from './components/layout/Sidebar';
-import { Header } from './components/layout/Header';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { NavItem, OllamaStatus } from './types';
+import { CoinRackViewer, COIN_FEATURES } from './components/coins/CoinRackViewer';
 import { UploadModal } from './components/upload/UploadModal';
 import { ReviewWorkspaceModal } from './components/review/ReviewWorkspaceModal';
-import { CoinRackViewer } from './components/coins/CoinRackViewer';
 
 import { OverviewPage } from './pages/OverviewPage';
 import { InvoicesPage } from './pages/InvoicesPage';
@@ -13,24 +12,40 @@ import { VendorsPage } from './pages/VendorsPage';
 import { ExpensesPage } from './pages/ExpensesPage';
 import { RulesPage } from './pages/RulesPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { LocalAiPage } from './pages/LocalAiPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 import { api } from './api/client';
-import type { OllamaStatus } from './types';
+import {
+  ArrowLeft,
+  UploadCloud,
+  Search,
+  Sun,
+  Moon,
+  ChevronDown,
+  Layers,
+  Sparkles,
+  RotateCcw
+} from 'lucide-react';
 
 export const App: React.FC = () => {
+  // Application Mode: 'conveyor' (State A) or 'workspace' (State B)
+  const [appMode, setAppMode] = useState<'conveyor' | 'workspace'>('conveyor');
   const [currentTab, setCurrentTab] = useState<NavItem>('overview');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Removed coins persistence during session (empty slot on conveyor)
+  const [removedCoins, setRemovedCoins] = useState<string[]>([]);
+
+  // Theme
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('ledgerlens_theme') !== 'light';
   });
 
-  // 3D Coin Rack showcase toggle (starts open on first load for cinematic animation)
-  const [isCoinRackOpen, setIsCoinRackOpen] = useState(true);
-
   // Global modals
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedReviewDocId, setSelectedReviewDocId] = useState<string | null>(null);
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
 
   // Status & badge counts
   const [reviewCount, setReviewCount] = useState(0);
@@ -63,33 +78,49 @@ export const App: React.FC = () => {
     } catch {}
   };
 
-  const handleOpenReview = (id: string) => {
-    setSelectedReviewDocId(id);
-  };
+  // Keyboard navigation: Escape key returns to the conveyor if no modal is active
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (!isUploadOpen && !selectedReviewDocId && appMode === 'workspace') {
+          e.preventDefault();
+          setAppMode('conveyor');
+        }
+      }
+    };
 
-  const handleCloseReview = () => {
-    setSelectedReviewDocId(null);
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [appMode, isUploadOpen, selectedReviewDocId]);
 
-  const handleUploadSuccess = () => {
-    loadAppStatus();
-  };
+  const handleSelectCoin = useCallback((tab: NavItem) => {
+    // Add chosen coin to removed list (persisted during session)
+    setRemovedCoins(prev => Array.from(new Set([...prev, tab])));
+    setCurrentTab(tab);
+    setAppMode('workspace');
+  }, []);
 
-  const renderContent = () => {
+  const handleRestoreCoins = useCallback(() => {
+    setRemovedCoins([]);
+  }, []);
+
+  const activeCoinMeta = COIN_FEATURES.find(c => c.id === currentTab) || COIN_FEATURES[0];
+
+  const renderWorkspaceContent = () => {
     switch (currentTab) {
       case 'overview':
         return (
           <OverviewPage
-            onOpenReview={handleOpenReview}
+            onOpenReview={(id) => setSelectedReviewDocId(id)}
             onOpenUpload={() => setIsUploadOpen(true)}
-            onNavigateTab={setCurrentTab}
+            onNavigateTab={(tab) => setCurrentTab(tab as NavItem)}
             searchQuery={searchQuery}
           />
         );
       case 'invoices':
         return (
           <InvoicesPage
-            onOpenReview={handleOpenReview}
+            onOpenReview={(id) => setSelectedReviewDocId(id)}
             onOpenUpload={() => setIsUploadOpen(true)}
             globalSearch={searchQuery}
           />
@@ -97,7 +128,7 @@ export const App: React.FC = () => {
       case 'receipts':
         return (
           <ReceiptsPage
-            onOpenReview={handleOpenReview}
+            onOpenReview={(id) => setSelectedReviewDocId(id)}
             onOpenUpload={() => setIsUploadOpen(true)}
             globalSearch={searchQuery}
           />
@@ -105,7 +136,7 @@ export const App: React.FC = () => {
       case 'review':
         return (
           <ReviewQueuePage
-            onOpenReview={handleOpenReview}
+            onOpenReview={(id) => setSelectedReviewDocId(id)}
             onOpenUpload={() => setIsUploadOpen(true)}
             globalSearch={searchQuery}
           />
@@ -113,14 +144,14 @@ export const App: React.FC = () => {
       case 'vendors':
         return (
           <VendorsPage
-            onOpenReview={handleOpenReview}
+            onOpenReview={(id) => setSelectedReviewDocId(id)}
             globalSearch={searchQuery}
           />
         );
       case 'expenses':
         return (
           <ExpensesPage
-            onOpenReview={handleOpenReview}
+            onOpenReview={(id) => setSelectedReviewDocId(id)}
             globalSearch={searchQuery}
           />
         );
@@ -128,6 +159,8 @@ export const App: React.FC = () => {
         return <RulesPage />;
       case 'reports':
         return <ReportsPage />;
+      case 'local_ai':
+        return <LocalAiPage />;
       case 'settings':
         return <SettingsPage />;
       default:
@@ -136,66 +169,174 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#fbfbfa] dark:bg-[#08100c] text-slate-900 dark:text-slate-100 font-sans">
-      {/* Sidebar navigation */}
-      <Sidebar
-        currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        reviewCount={reviewCount}
-        ollamaStatus={ollamaStatus}
-        onOpenUpload={() => setIsUploadOpen(true)}
-      />
+    <div className="relative w-screen h-screen overflow-hidden bg-[#050A0B] text-slate-100 font-sans">
+      {/* ======================================================== */}
+      {/* STATE A: IMMERSIVE 3D COIN CONVEYOR (Full Screen, No Sidebar) */}
+      {/* ======================================================== */}
+      {appMode === 'conveyor' && (
+        <div className="absolute inset-0 w-full h-full z-10 animate-in fade-in zoom-in-95 duration-400">
+          <CoinRackViewer
+            currentTab={currentTab}
+            onSelectTab={handleSelectCoin}
+            removedCoins={removedCoins}
+            onRestoreCoins={handleRestoreCoins}
+            ollamaStatus={ollamaStatus}
+            onOpenUpload={() => setIsUploadOpen(true)}
+            reviewCount={reviewCount}
+          />
+        </div>
+      )}
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <Header
-          currentTab={currentTab}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          ollamaStatus={ollamaStatus}
-          onOpenUpload={() => setIsUploadOpen(true)}
-          isDarkMode={isDarkMode}
-          onToggleTheme={() => setIsDarkMode(prev => !prev)}
-          isCoinRackOpen={isCoinRackOpen}
-          onToggleCoinRack={() => setIsCoinRackOpen(prev => !prev)}
-        />
+      {/* ======================================================== */}
+      {/* STATE B: SELECTED WORKSPACE (Full Screen, Sidebar-Free)  */}
+      {/* ======================================================== */}
+      {appMode === 'workspace' && (
+        <div className="absolute inset-0 w-full h-full flex flex-col z-10 bg-[#050A0B] animate-in fade-in slide-in-from-bottom-3 duration-300">
+          {/* Top Floating Glass HUD */}
+          <header className="h-16 px-6 border-b border-slate-800/80 bg-[#071310]/90 backdrop-blur-xl flex items-center justify-between shrink-0 z-20">
+            {/* Left: Return to Conveyor CTA & Active Coin Pill */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setAppMode('conveyor')}
+                className="group px-3.5 py-2 rounded-xl bg-[#0b1b17] hover:bg-[#122e27] border border-emerald-500/30 text-emerald-300 hover:text-emerald-200 text-xs font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
+                title="Return to 3D Conveyor (Esc)"
+              >
+                <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
+                <span>Return to Conveyor</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/40 text-slate-400 font-mono hidden sm:inline">
+                  Esc
+                </span>
+              </button>
 
-        <main className="flex-1 overflow-y-auto">
-          {/* Interactive 3D Coin Rack Section */}
-          {isCoinRackOpen && (
-            <div className="px-6 pt-5 animate-in fade-in slide-in-from-top-3 duration-200">
-              <CoinRackViewer
-                currentTab={currentTab}
-                onSelectTab={(tab) => {
-                  setCurrentTab(tab);
-                }}
-              />
+              {/* Active Workspace Selector Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsWorkspaceMenuOpen(p => !p)}
+                  className="px-3 py-1.5 rounded-xl bg-[#091512] hover:bg-[#0f231f] border flex items-center gap-2 text-xs font-bold transition-colors cursor-pointer"
+                  style={{
+                    borderColor: `${activeCoinMeta.color}50`,
+                    color: activeCoinMeta.textColor
+                  }}
+                >
+                  <span
+                    className="size-5 rounded-lg flex items-center justify-center text-xs font-bold"
+                    style={{ backgroundColor: `${activeCoinMeta.color}25`, color: activeCoinMeta.color }}
+                  >
+                    {activeCoinMeta.badgeIcon}
+                  </span>
+                  <span>{activeCoinMeta.name}</span>
+                  <ChevronDown className="size-3 text-slate-400" />
+                </button>
+
+                {/* Workspace Fast Switch Menu */}
+                {isWorkspaceMenuOpen && (
+                  <div
+                    className="absolute top-full left-0 mt-2 w-64 p-1.5 rounded-2xl bg-[#091714] border border-slate-800 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2"
+                    onMouseLeave={() => setIsWorkspaceMenuOpen(false)}
+                  >
+                    <div className="px-3 py-1.5 text-[10px] uppercase font-mono tracking-wider text-slate-400">
+                      Switch Feature Workspace
+                    </div>
+                    <div className="space-y-0.5">
+                      {COIN_FEATURES.map(feat => {
+                        const isCurrent = feat.id === currentTab;
+                        return (
+                          <button
+                            key={feat.id}
+                            onClick={() => {
+                              setCurrentTab(feat.id);
+                              setRemovedCoins(prev => Array.from(new Set([...prev, feat.id])));
+                              setIsWorkspaceMenuOpen(false);
+                            }}
+                            className={`w-full px-3 py-2 rounded-xl flex items-center gap-2.5 text-xs text-left transition-colors cursor-pointer ${
+                              isCurrent
+                                ? 'bg-emerald-950/60 text-white font-bold'
+                                : 'text-slate-300 hover:bg-[#11241f] hover:text-white'
+                            }`}
+                          >
+                            <span
+                              className="size-5 rounded-lg flex items-center justify-center text-xs font-bold"
+                              style={{ backgroundColor: `${feat.color}20`, color: feat.color }}
+                            >
+                              {feat.badgeIcon}
+                            </span>
+                            <span className="flex-1">{feat.name}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{feat.subtext}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
 
-          {/* Active Feature View */}
-          <div className="transition-all duration-200">
-            {renderContent()}
-          </div>
-        </main>
-      </div>
+            {/* Center: Search Field */}
+            <div className="hidden lg:flex items-center w-80 max-w-sm">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-500" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder={`Search ${activeCoinMeta.name.toLowerCase()}...`}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-[#030807] border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-emerald-500 outline-none transition-colors"
+                />
+              </div>
+            </div>
 
-      {/* Upload Modal */}
+            {/* Right: Actions, AI Status, Quick Import, Theme */}
+            <div className="flex items-center gap-3">
+              {/* Ollama Status Pill */}
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#091512] border border-slate-800 text-xs font-mono">
+                <span className={`size-2 rounded-full ${ollamaStatus?.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                <span className="text-slate-300">Gemma 3:4b</span>
+                <span className="text-emerald-400 font-semibold">{ollamaStatus?.isOnline ? 'Active' : 'Offline'}</span>
+              </div>
+
+              {/* Quick Import CTA */}
+              <button
+                onClick={() => setIsUploadOpen(true)}
+                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/60 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+              >
+                <UploadCloud className="size-3.5" />
+                <span>Import Invoices</span>
+              </button>
+
+              {/* Theme Toggle */}
+              <button
+                onClick={() => setIsDarkMode(prev => !prev)}
+                className="p-2 rounded-xl bg-[#091512] hover:bg-[#11241f] border border-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {isDarkMode ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+              </button>
+            </div>
+          </header>
+
+          {/* Main Full-Screen Workspace Body */}
+          <main className="flex-1 overflow-y-auto bg-[#050A0B] text-slate-100">
+            <div key={currentTab} className="animate-in fade-in duration-200">
+              {renderWorkspaceContent()}
+            </div>
+          </main>
+        </div>
+      )}
+
+      {/* Global Modals */}
       <UploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
-        onUploadSuccess={handleUploadSuccess}
+        onUploadSuccess={loadAppStatus}
       />
 
-      {/* Review Workspace Split-Screen Modal */}
       <ReviewWorkspaceModal
         documentId={selectedReviewDocId}
-        onClose={handleCloseReview}
-        onRefresh={() => {
-          loadAppStatus();
-        }}
+        onClose={() => setSelectedReviewDocId(null)}
+        onRefresh={loadAppStatus}
       />
     </div>
   );
 };
+
 export default App;

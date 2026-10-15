@@ -24,6 +24,7 @@ const TAB_TITLES: Record<NavItem, { title: string; subtitle: string }> = {
   expenses: { title: 'Expenses', subtitle: 'Recorded financial expenses linked to source documents' },
   rules: { title: 'Automation Rules', subtitle: 'Custom conditional workflows and Gemma AI assistant' },
   reports: { title: 'Financial Reports', subtitle: 'Tax summaries, monthly breakdowns, and category exports' },
+  local_ai: { title: 'Local AI Center', subtitle: 'On-device Ollama & Gemma inference engine and benchmarks' },
   settings: { title: 'Settings & Privacy', subtitle: 'Ollama model configuration, local storage, and database controls' },
 };
 

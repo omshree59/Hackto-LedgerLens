@@ -13,18 +13,9 @@ import {
   Cpu,
   ArrowUpRight
 } from 'lucide-react';
-import type { OllamaStatus } from '../../types';
+import type { NavItem, OllamaStatus } from '../../types';
 
-export type NavItem =
-  | 'overview'
-  | 'invoices'
-  | 'receipts'
-  | 'review'
-  | 'vendors'
-  | 'expenses'
-  | 'rules'
-  | 'reports'
-  | 'settings';
+export type { NavItem };
 
 interface SidebarProps {
   currentTab: NavItem;
