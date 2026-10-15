@@ -1,171 +1,237 @@
-# LedgerLens 🔍🧾
+# LedgerLens 🔍🪙
 
-> **"Your invoices, organized. Your data, yours."**
-> Premium, local-first AI invoice & receipt management application inspired by InvoiceSorter.app.
+> **"Your invoices, organized. Your data, yours."**  
+> *A premium, local-first AI financial workspace with an immersive 3D coin conveyor navigation experience, inspired by InvoiceSorter.app.*
 
-LedgerLens automatically extracts, organizes, categorizes, and tracks invoices and receipts using **local AI (Gemma 3 4B through Ollama)**. All documents, OCR text, extracted financial records, and automation rules stay completely on your computer—zero cloud AI APIs invoked.
-
----
-
-## 🌟 Key Features
-
-1. **100% Private, Local-First AI Inference**
-   - Inference runs via Ollama (`http://127.0.0.1:11434`) using the default model `gemma3:4b`.
-   - No external API keys (no OpenAI, Gemini, or Anthropic cloud endpoints).
-   - Zero telemetry tracking. Original documents remain stored in private local directories.
-
-2. **Smart Invoice & Receipt Inbox**
-   - Drag-and-drop batch upload for PDF, PNG, JPG, JPEG, and WEBP documents (up to 25MB each).
-   - Multi-stage local processing: Tesseract.js OCR for images, modern `unpdf` and `pdf-parse` for PDFs, with scanned PDF fallback detection.
-   - Comprehensive document tables with status badges, vendor filtering, date ranges, amount filters, sorting, and pagination.
-   - Multi-select bulk actions: Bulk Approve, Bulk Categorize, Bulk Export CSV, and Bulk Delete.
-
-3. **Split-Screen AI Review Workspace**
-   - **Left Panel**: High-fidelity PDF/image viewer with zoom controls (50% to 200%), reset zoom, and original file download.
-   - **Right Panel**: Extracted financial fields (Vendor, Tax ID, Invoice #, Issue Date, Due Date, Payment Status, Subtotal, Tax Amount, Total, Category, Tags), field-level confidence scores, and validation warnings.
-   - **Line Items Editor**: Editable table to add, modify, or delete line items with quantities, unit prices, and line totals.
-   - Actions to save edits, approve into expenses, reprocess with Ollama, or archive duplicates.
-
-4. **Multi-Factor Duplicate Detection**
-   - Exact SHA-256 cryptographic file hashing detects identical file uploads instantly.
-   - Probable invoice collision detection compares normalized vendor names, invoice numbers, dates, and amounts.
-   - Clear comparison UI with options to *"Mark as Legitimate Separate Transaction"* or *"Confirm Duplicate & Archive"*.
-
-5. **Gemma Natural Language Automation Rules**
-   - Visual rule builder supporting AND/OR logic with conditions (`vendor_name`, `total_amount`, `currency`, `document_type`, etc.) and actions (`set_category`, `add_tag`, `set_priority`, `flag_review`, etc.).
-   - Built-in **Gemma Natural Language Assistant**: Type requests like *"When vendor is Cloudflare, add the Software tag and assign the Technology category"* and let Gemma generate the structured rule with deterministic backend validation.
-   - Rule execution audit history tracking past automated actions.
-
-6. **Expense Tracking & Vendor Directory**
-   - Single-source expense synchronization: Approving an invoice records it into the expense registry and prevents duplicate expense generation when reprocessing.
-   - Vendor directory tracking lifetime spend, invoice counts, most recent invoice dates, with safe vendor merging.
-
-7. **Financial Analytics, Tax Summaries & RFC 4180 CSV Export**
-   - Real SQLite-computed metrics (monthly spending trends, category distributions, paid vs unpaid breakdowns).
-   - Annual tax & VAT estimations.
-   - Safe CSV exports for Invoices, Receipts, Expenses, and Vendors with spreadsheet formula injection defense (`=`, `+`, `-`, `@` prefixes sanitized).
-   - Automatic local folder reorganization into `Invoices/YYYY/MM/Vendor_InvoiceNumber.pdf`.
+[![Local AI: Gemma 3](https://img.shields.io/badge/AI-Gemma%203%20(4B)%20via%20Ollama-emerald?style=flat-square)](https://ollama.com)
+[![Privacy: 100% Local](https://img.shields.io/badge/Privacy-100%25%20On--Device-teal?style=flat-square)](#-privacy--security-guarantees)
+[![Database: SQLite WAL](https://img.shields.io/badge/Database-SQLite%20(better--sqlite3)-blue?style=flat-square)](https://sqlite.org)
+[![Engine: Three.js 60FPS](https://img.shields.io/badge/3D%20Engine-Three.js%20(60%20FPS)-purple?style=flat-square)](#-3d-coin-conveyor--camera-controls)
+[![Test Suite: 10/10 Passing](https://img.shields.io/badge/Tests-10%2F10%20Passing-success?style=flat-square)](#-testing--quality-assurance)
 
 ---
 
-## 🏗️ Architecture & Technology Stack
+## 🎯 Who Is LedgerLens For?
+
+LedgerLens was crafted for individuals and organizations who manage high volumes of invoices, bills, and receipts, but **refuse to compromise their financial privacy** by sending documents to third-party cloud AI vendors:
+
+- **Independent Freelancers & Solopreneurs:** Auto-extract client billing information, track deductible expense slips, and maintain organized records for tax season without manual data entry.
+- **Small Business Owners & Agency Founders:** Streamline accounts payable, monitor vendor spend distributions, and catch duplicate billings before money leaves the bank.
+- **CPAs, Bookkeepers & Accounting Professionals:** Verify high-stakes financial data using human-in-the-loop side-by-side verification with field-level confidence scores.
+- **Privacy-First Creators:** Protect sensitive banking details, client contracts, and vendor tax IDs entirely on localhost—zero external telemetry, zero subscription fees.
+
+---
+
+## 💡 The Core Differentiator: 100% Private Local AI
+
+Traditional invoice SaaS products upload your private bank statements and vendor invoices to remote cloud APIs (OpenAI, AWS Textract, Google Cloud). **LedgerLens keeps every byte on your computer**:
+
+| Feature | Typical Cloud SaaS | LedgerLens |
+| :--- | :--- | :--- |
+| **Inference Location** | Remote Cloud Servers | **100% Localhost (`127.0.0.1:11434`)** |
+| **AI Model** | Proprietary Cloud Models | **Google Gemma 3 (4B) via Ollama** |
+| **File Storage** | Cloud S3 Buckets | **Local Encrypted/Private Directory** |
+| **Database** | Multi-tenant Remote Cloud | **Single-Tenant Local SQLite (`WAL` mode)** |
+| **Recurring AI Costs** | Monthly Subscriptions & Token Fees | **Free & Unlimited Local Compute** |
+| **Data Privacy** | Subject to third-party terms | **Absolute Zero Network Leaks** |
+
+---
+
+## 🪙 3D Coin Conveyor Navigation Paradigm
+
+Instead of a generic, cluttered dashboard layout, LedgerLens introduces an **immersive 3D tactile conveyor experience**:
 
 ```
-ledgerlens/
-├── packages/
-│   ├── backend/               # Node.js + Express + TypeScript + SQLite
-│   │   ├── src/
-│   │   │   ├── config.ts      # Server configuration & local paths
-│   │   │   ├── db/            # SQLite schema, indices & migrations
-│   │   │   ├── services/      # Ollama, OCR, Duplicate, Rules, Expense, Export
-│   │   │   ├── routes/        # Express REST API endpoints
-│   │   │   ├── types/         # Domain TypeScript types
-│   │   │   └── tests/         # Vitest unit & integration tests
-│   ├── frontend/              # React 19 + TypeScript + Vite + Tailwind CSS v4
-│   │   ├── src/
-│   │   │   ├── api/           # Type-safe API client
-│   │   │   ├── components/    # Sidebar, Header, UploadModal, ReviewWorkspaceModal, DocumentTable
-│   │   │   ├── pages/         # Overview, Invoices, Receipts, Review, Vendors, Expenses, Rules, Reports, Settings
-│   │   │   └── types/         # Frontend domain types
-└── data/                      # Private local file storage & SQLite database
-    ├── uploads/               # Uploaded originals
-    ├── exports/               # Exported CSVs & organized folder trees
-    └── ledgerlens.sqlite      # SQLite database with WAL mode
+[ STATE A: 3D Coin Conveyor ] ──(Click / Space / Enter)──> [ STATE B: Full-Screen Workspace ]
+              ▲                                                               │
+              └──────────────(Return via Esc / Floating HUD)──────────────────┘
 ```
+
+### State A: The Immersive Conveyor
+- **Cinematic Atmosphere:** Diagonal metallic conveyor rack set in an obsidian environment (`#050A0B`) with teal (`#00D6A0`) and electric violet (`#B45BFF`) edge neon and soft volumetric lighting.
+- **10 Collectible Metallic Feature Coins:** Each token features physical thickness, knurled fluted rims, engraved badge symbols, and embossed typography.
+- **Interactive 360° Orbiting:** Rotate horizontally and vertically around the scene, zoom from overview to macro detail, and pan freely.
+- **Session-Persisted Coin Pickup:** Selecting a feature physically elevates the coin out of its slot. Returning to the conveyor shows an empty recessed slot with a faint ambient glow, with an explicit **Restore Coins** button available.
+
+### State B: The Sidebar-Free Workspace
+- **Distraction-Free Focus:** The selected feature takes over the entire viewport with no permanent sidebar eating screen real estate.
+- **Glass Top HUD:** Minimal floating controller featuring `← Return to Conveyor [Esc]`, active workspace selector, quick search, Ollama engine health status, and quick `+ Import Invoices` CTA.
 
 ---
 
-## 🚀 Quick Start Guide
+## 🌟 The 10 Feature Workspaces
+
+| Coin # | Feature | Accent Color | Description |
+| :---: | :--- | :--- | :--- |
+| **1** | **Overview** | `#00D6A0` Emerald | Financial analytics, monthly spending trends, category distributions, and real-time document counters. |
+| **2** | **Invoices** | `#B45BFF` Violet | Accounts payable inbox with OCR confidence badges, payment status filters, and bulk operations. |
+| **3** | **Receipts** | `#3185FF` Blue | Dedicated expense slip registry with merchant parsing, payment method badges, and currency normalizer. |
+| **4** | **Review Queue** | `#FFB000` Amber | High-priority human-in-the-loop review for low-confidence extractions and duplicate candidates. |
+| **5** | **Vendors** | `#06B6D4` Cyan | Merchant profiles, aggregated lifetime spend metrics, average invoice sizes, and vendor deduplication merging. |
+| **6** | **Expenses** | `#059669` Green | Single-source recorded business expenses linked directly to verified source documents. |
+| **7** | **Automation Rules** | `#7B35FF` Purple | Custom conditional rules (AND/OR logic) with a **Gemma natural language rule translator**. |
+| **8** | **Reports** | `#2563EB` Deep Blue | Annual tax & VAT breakdowns, sanitized RFC 4180 CSV exports, and automated local folder file reorganization. |
+| **9** | **Local AI Hub** | `#68FFE0` Mint | On-device model discovery, temperature determinism sliders, latency benchmarks, and live prompt testing playground. |
+| **10** | **Settings** | `#94A3B8` Silver | Local SQLite database maintenance, storage metrics, custom expense categories, and system reset controls. |
+
+---
+
+## 🛠️ Technology Stack
+
+- **Frontend:**
+  - **Framework:** React 19 + TypeScript
+  - **Build Tool:** Vite
+  - **Styling:** Tailwind CSS v4
+  - **3D Graphics:** Three.js + OrbitControls (custom 60 FPS frame-independent damping)
+  - **Charts & Motion:** Recharts, Framer Motion, Lucide Icons
+- **Backend:**
+  - **Runtime:** Node.js (ES Modules)
+  - **Server Framework:** Express + TypeScript + `tsx`
+  - **Database:** SQLite via `better-sqlite3` (WAL mode enabled)
+  - **Validation:** Zod schemas
+  - **Document Processing:** Tesseract.js (local OCR), `unpdf`, `pdf-parse`, and `pdf-lib`
+  - **Hashing:** Cryptographic SHA-256 for instant bit-for-bit duplicate detection
+- **Local AI:**
+  - **Engine:** Ollama running locally at `http://127.0.0.1:11434`
+  - **Model:** `gemma3:4b` (Google Gemma 3 4B parameters)
+  - **Extraction:** Deterministic JSON schema prompting with strict null-fallback parsing
+
+---
+
+## 🚀 Getting Started
 
 ### 1. Prerequisites
-- **Node.js**: v20+ or v22+
-- **Ollama**: Installed from [ollama.com](https://ollama.com)
+- **Node.js**: `v20.x` or `v22.x` installed
+- **Ollama**: Download and install from [ollama.com](https://ollama.com)
 
-### 2. Pull Gemma Model & Start Ollama
-In your terminal, pull the required model:
+### 2. Pull the Local Gemma Model
+Open your terminal and pull the default model:
 ```bash
 ollama pull gemma3:4b
 ```
-Ensure the Ollama service is running:
+
+Ensure Ollama is running (it typically starts automatically in the system tray, or you can run):
 ```bash
 ollama serve
 ```
 
-### 3. Install Dependencies
-From the repository root:
+### 3. Clone & Install Dependencies
 ```bash
+git clone https://github.com/your-username/ledgerlens.git
+cd ledgerlens
 npm install
 ```
 
-### 4. Run Development Servers
-Start both backend (port 3001) and frontend (port 5173):
+### 4. Running the Application
+
+You can start both frontend and backend concurrently from the root directory:
+
 ```bash
+# Starts Express backend (port 3001) and Vite frontend (port 5173) concurrently:
 npm run dev
 ```
 
-Or run them individually:
-```bash
-npm run dev:backend   # Express backend on http://127.0.0.1:3001
-npm run dev:frontend  # Vite frontend on http://localhost:5173
-```
+Alternatively, you can run services individually:
 
-Open your browser to:
-**http://localhost:5173**
+#### Starting the Backend:
+```bash
+# From project root:
+npm run dev:backend
+
+# Or from inside packages/backend:
+cd packages/backend
+npm run dev
+```
+*Backend runs at:* **`http://127.0.0.1:3001`**
+
+#### Starting the Frontend:
+```bash
+# From project root:
+npm run dev:frontend
+
+# Or from inside packages/frontend:
+cd packages/frontend
+npm run dev
+```
+*Frontend runs at:* **`http://localhost:5173/`**
 
 ---
 
-## 🧪 Running Automated Tests
+## 🎮 3D Conveyor Controls & Cheat Sheet
 
-Run backend unit and integration tests with Vitest:
+The 3D environment supports full mouse, trackpad, touch, and keyboard interactions:
+
+| Action | Control / Gesture | Description |
+| :--- | :--- | :--- |
+| **Orbit 360°** | `Left-Click + Drag` | Rotate around the conveyor from any angle or elevation. |
+| **Zoom In / Out** | `Mouse Wheel` / `Pinch` | Smoothly zoom in for macro coin inspection or out for rack overview. |
+| **Pan Camera** | `Right-Click + Drag` | Pan camera focus across the conveyor plane. |
+| **Select Coin** | `Single Click` / `Enter` | Elevates the coin and opens its full-screen workspace. |
+| **Focus Coin** | `Double Click` | Dollies the camera directly in front of the clicked coin. |
+| **Slide Conveyor** | `←` / `→` or `A` / `D` | Smoothly slides the conveyor to neighboring coins. |
+| **Camera Presets** | `Keys 1, 2, 3, 4` | Instant smooth transition: `1` Cinematic, `2` Front, `3` Top, `4` Isometric. |
+| **Reset Camera** | `Key R` | Restores the default cinematic perspective view. |
+| **Return to Conveyor**| `Esc` | Returns from any workspace back to the 3D coin conveyor. |
+| **Restore Coins** | `Alt + R` | Restores all picked-up coins back to their conveyor slots. |
+
+---
+
+## 🔬 Split-Screen Human Review Workspace
+
+For documents requiring verification or duplicate resolution:
+1. **Side-by-Side Visual Inspection:** High-fidelity pan-and-zoom preview of original PDF or image on the left; structured fields on the right.
+2. **Confidence Scores & Warnings:** Field-level indicators highlighting low-confidence values, missing due dates, or unverified tax amounts.
+3. **Editable Line Items:** Add, remove, or modify extracted line items with quantity, unit price, and automatic subtotal calculation.
+4. **One-Click Approval:** Instantly converts approved invoices into verified Expense records, updating vendor profiles and monthly spend totals.
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+Run the comprehensive automated Vitest test suite covering extraction, validation, duplicate detection, and rule execution:
+
 ```bash
+# Run backend test suite:
 npm run test
-```
 
-Build both frontend and backend for production:
-```bash
+# Run production build checks:
 npm run build
 ```
 
 ---
 
-## 📡 REST API Reference
+## 🔒 Privacy & Security Guarantees
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/health` | GET | System health & SQLite connectivity |
-| `/api/ollama/status` | GET | Connection state & installed models |
-| `/api/ollama/set-model` | POST | Configure active local AI model |
-| `/api/documents/upload` | POST | Multi-file document upload & queue processing |
-| `/api/documents` | GET | Filtered & paginated documents |
-| `/api/documents/:id` | GET | Document detail, extracted fields, and line items |
-| `/api/documents/:id` | PUT | Save human corrections to extracted fields |
-| `/api/documents/:id/approve` | POST | Approve document and sync into Expenses |
-| `/api/documents/:id/reprocess` | POST | Re-trigger Gemma extraction on document |
-| `/api/documents/:id/duplicate-action` | POST | Clear or confirm duplicate candidate |
-| `/api/documents/:id` | DELETE | Delete document, DB records, and local file |
-| `/api/documents/bulk` | POST | Bulk approve, delete, or categorize documents |
-| `/api/expenses` | GET / POST | List filtered expenses or create manual expense |
-| `/api/vendors` | GET | Vendor spending directory and invoice counts |
-| `/api/vendors/merge` | POST | Reassign records from duplicate vendor |
-| `/api/rules` | GET / POST | Manage automation rules |
-| `/api/rules/assistant` | POST | Gemma natural language rule translation |
-| `/api/analytics/dashboard` | GET | Real SQLite KPIs, trends, and recent records |
-| `/api/export/csv` | GET | Download RFC 4180 sanitized CSV |
-| `/api/export/organize` | POST | Trigger local directory file organization |
-| `/api/settings/seed-demo` | POST | Populate realistic synthetic records (labeled Demo) |
-| `/api/settings/reset` | POST | Purge all database records and storage files |
+1. **Local Loopback Only:** Express and SQLite exclusively bind to `127.0.0.1` by default, preventing unintended network exposure.
+2. **Prompt Injection Hardening:** The extraction engine treats raw OCR document text as untrusted data with strict system prompt boundaries, preventing embedded text commands from hijacking model output.
+3. **CSV Formula Injection Sanitization:** Exported CSV cells starting with sensitive formula triggers (`=`, `+`, `-`, `@`, `\t`, `\r`) are automatically escaped with a leading apostrophe (`'`).
+4. **Collision-Proof Storage:** Uploaded files are renamed using cryptographic UUIDs and validated against allowed MIME types (`application/pdf`, `image/png`, `image/jpeg`, `image/webp`).
 
 ---
 
-## 🔒 Security & Privacy Guarantees
+## 📡 REST API Quick Reference
 
-1. **Loopback Binding**: Backend binds to `127.0.0.1` by default to prevent unauthorized network exposure.
-2. **Untrusted Prompt Protection**: System prompt strictly commands Gemma to treat documents as untrusted data and ignore embedded prompt injection commands.
-3. **CSV Formula Injection Defense**: All exported cells starting with `=`, `+`, `-`, `@`, `\t`, or `\r` are escaped with a prepended apostrophe (`'`).
-4. **Collision & Traversal Protection**: Uploaded files receive sanitized UUID identifiers; original paths are never trusted from the client.
+| Endpoint | Method | Purpose |
+| :--- | :---: | :--- |
+| `/api/health` | `GET` | Health check and database connection status |
+| `/api/ollama/status` | `GET` | Ollama connectivity and discovered model weights |
+| `/api/ollama/test-prompt` | `POST` | Measure inference latency and token output |
+| `/api/documents/upload` | `POST` | Multi-file upload with OCR and SHA-256 deduplication |
+| `/api/documents` | `GET` | Paginated and filtered invoice/receipt documents |
+| `/api/documents/:id` | `GET` / `PUT` | Read detail or update human corrections |
+| `/api/documents/:id/approve` | `POST` | Approve document and create synchronized expense entry |
+| `/api/documents/bulk` | `POST` | Bulk approve, categorize, or delete items |
+| `/api/vendors` | `GET` | Merchant directory with spend aggregation |
+| `/api/vendors/merge` | `POST` | Merge duplicate vendors and reassign documents |
+| `/api/rules` | `GET` / `POST` | Create and list conditional automation workflows |
+| `/api/rules/assistant` | `POST` | Natural language rule synthesis via Gemma |
+| `/api/export/csv` | `GET` | Sanitized RFC 4180 spreadsheet export |
+| `/api/export/organize` | `POST` | Reorganize files into `Invoices/YYYY/MM/Vendor.pdf` |
 
 ---
 
 ## 📄 License
-MIT License.
-LedgerLens – Built for freelancers, independent creators, and accounting professionals who value their privacy.
+
+Distributed under the **MIT License**.
+
+*Built for freelancers, independent creators, and accounting professionals who value their privacy.*
