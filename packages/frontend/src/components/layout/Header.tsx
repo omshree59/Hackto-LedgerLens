@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Shield, UploadCloud, Moon, Sun, Lock } from 'lucide-react';
+import { Search, Shield, UploadCloud, Moon, Sun, Lock, Layers } from 'lucide-react';
 import type { NavItem } from './Sidebar';
 import type { OllamaStatus } from '../../types';
 
@@ -11,6 +11,8 @@ interface HeaderProps {
   onOpenUpload: () => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
+  isCoinRackOpen: boolean;
+  onToggleCoinRack: () => void;
 }
 
 const TAB_TITLES: Record<NavItem, { title: string; subtitle: string }> = {
@@ -32,7 +34,9 @@ export const Header: React.FC<HeaderProps> = ({
   ollamaStatus,
   onOpenUpload,
   isDarkMode,
-  onToggleTheme
+  onToggleTheme,
+  isCoinRackOpen,
+  onToggleCoinRack
 }) => {
   const current = TAB_TITLES[currentTab] || { title: 'LedgerLens', subtitle: 'Invoice Management' };
 
@@ -62,6 +66,20 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Status Badges & Quick Action */}
       <div className="flex items-center gap-2.5 shrink-0">
+        {/* 3D Coin Rack Toggle Button */}
+        <button
+          onClick={onToggleCoinRack}
+          title="Toggle 3D Coin Feature Rack"
+          className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+            isCoinRackOpen
+              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-300 shadow-xs'
+              : 'border-slate-200 dark:border-[#1f3a2c] text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#11241c]'
+          }`}
+        >
+          <Layers className="size-3.5 text-emerald-500" />
+          <span className="hidden sm:inline">3D Coin Rack</span>
+        </button>
+
         {/* Privacy Shield Pill */}
         <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-300 text-[11px] font-medium">
           <Lock className="size-3 text-emerald-600 dark:text-emerald-400" />

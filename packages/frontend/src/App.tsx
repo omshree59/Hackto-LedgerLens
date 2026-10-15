@@ -3,6 +3,7 @@ import { Sidebar, type NavItem } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { UploadModal } from './components/upload/UploadModal';
 import { ReviewWorkspaceModal } from './components/review/ReviewWorkspaceModal';
+import { CoinRackViewer } from './components/coins/CoinRackViewer';
 
 import { OverviewPage } from './pages/OverviewPage';
 import { InvoicesPage } from './pages/InvoicesPage';
@@ -23,6 +24,9 @@ export const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('ledgerlens_theme') !== 'light';
   });
+
+  // 3D Coin Rack showcase toggle (starts open on first load for cinematic animation)
+  const [isCoinRackOpen, setIsCoinRackOpen] = useState(true);
 
   // Global modals
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -152,10 +156,27 @@ export const App: React.FC = () => {
           onOpenUpload={() => setIsUploadOpen(true)}
           isDarkMode={isDarkMode}
           onToggleTheme={() => setIsDarkMode(prev => !prev)}
+          isCoinRackOpen={isCoinRackOpen}
+          onToggleCoinRack={() => setIsCoinRackOpen(prev => !prev)}
         />
 
         <main className="flex-1 overflow-y-auto">
-          {renderContent()}
+          {/* Interactive 3D Coin Rack Section */}
+          {isCoinRackOpen && (
+            <div className="px-6 pt-5 animate-in fade-in slide-in-from-top-3 duration-200">
+              <CoinRackViewer
+                currentTab={currentTab}
+                onSelectTab={(tab) => {
+                  setCurrentTab(tab);
+                }}
+              />
+            </div>
+          )}
+
+          {/* Active Feature View */}
+          <div className="transition-all duration-200">
+            {renderContent()}
+          </div>
         </main>
       </div>
 
