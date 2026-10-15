@@ -99,7 +99,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
   const [activePreset, setActivePreset] = useState<CameraPreset | 'custom'>('cinematic');
   const [currentFps, setCurrentFps] = useState(60);
 
-  // Mutable refs for 60fps animations
+  // Mutable refs for 60fps animations (Zero React state churn during interaction!)
   const isPlayingRef = useRef(true);
   isPlayingRef.current = isPlaying;
 
@@ -143,15 +143,18 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
   const animFrameRef = useRef<number | null>(null);
   const activeSpotlightRef = useRef<THREE.PointLight | null>(null);
 
-  // Array of coin items with direct mesh handles
+  // Array of coin items with direct mesh handles and per-coin smooth hover progress
   const coinItemsRef = useRef<Array<{
     group: THREE.Group;
     coinMesh: THREE.Mesh;
+    hitProxy: THREE.Mesh;
     haloMesh: THREE.Mesh;
     emptyGlowMesh: THREE.Mesh;
     feature: CoinFeature;
     index: number;
     baseX: number;
+    hoverProgress: number; // Continuous 0.0 to 1.0 hover state for jitter-free easing
+    colorObj: THREE.Color;
   }>>([]);
 
   // Sync target pos if currentTab changes externally
@@ -240,7 +243,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [TOTAL_COINS, activatePreset, onRestoreCoins, resetCamera, triggerCoinSelection]);
 
-  // Front face canvas texture (pre-rendered once)
+  // Front face canvas texture with full Mipmap generation to eliminate shimmering & aliasing
   const createCoinFaceTexture = useCallback((feature: CoinFeature): THREE.CanvasTexture => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -309,12 +312,14 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
+    // Mipmapping and linear filtering to eliminate edge shimmering!
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
     return texture;
   }, []);
 
-  // Back face canvas texture (official LedgerLens collectible emblem from all 360° angles!)
+  // Back face canvas texture with full Mipmap generation
   const createCoinBackFaceTexture = useCallback((feature: CoinFeature): THREE.CanvasTexture => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -384,12 +389,13 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
     return texture;
   }, []);
 
-  // Shared knurled rim bump texture created once
+  // Shared knurled rim bump texture with smoothed contrast to prevent normal-sampling jitter
   const sharedReededBump = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -399,23 +405,25 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     ctx.fillStyle = '#808080';
     ctx.fillRect(0, 0, 512, 32);
 
+    // Softened ridge transitions to prevent binary pixel moiré jitter
     for (let x = 0; x < 512; x += 4) {
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#b0b0b0';
       ctx.fillRect(x, 0, 2, 32);
-      ctx.fillStyle = '#1a1a1a';
+      ctx.fillStyle = '#505050';
       ctx.fillRect(x + 2, 0, 2, 32);
     }
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
-    texture.repeat.set(18, 1);
-    texture.generateMipmaps = false;
-    texture.minFilter = THREE.LinearFilter;
+    texture.repeat.set(16, 1);
+    texture.generateMipmaps = true;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
     return texture;
   }, []);
 
   // =========================================================================
-  // MASTER THREE.JS LIFECYCLE (MOUNTED ONCE - ZERO UNNECESSARY RECREATION!)
+  // MASTER THREE.JS LIFECYCLE (MOUNTED ONCE)
   // =========================================================================
   useEffect(() => {
     const container = containerRef.current;
@@ -427,22 +435,23 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     // 1. Scene
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    scene.background = new THREE.Color(0x050a0b); // #050A0B
-    scene.fog = new THREE.FogExp2(0x050a0b, 0.024);
+    scene.background = new THREE.Color(0x03040a);
+    scene.fog = new THREE.FogExp2(0x050611, 0.014);
 
-    // 2. Camera
-    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 90);
+    // 2. Camera: Extended far plane (120.0) so skybox and distant stars never clip on zoom-out
+    const camera = new THREE.PerspectiveCamera(36, width / height, 0.2, 120.0);
     camera.position.set(-2.0, 3.2, 9.2);
     camera.lookAt(0, 0.75, -0.4);
     cameraRef.current = camera;
 
-    // 3. WebGL Renderer with performance-capped DPR
+    // 3. WebGL Renderer with performance-capped DPR and stable depth buffer
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
       powerPreference: 'high-performance',
       stencil: false,
-      depth: true
+      depth: true,
+      logarithmicDepthBuffer: false
     });
     const targetPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     renderer.setSize(width, height);
@@ -455,23 +464,24 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     container.appendChild(renderer.domElement);
 
+    // Set maximum anisotropic filtering on textures if supported
+    const maxAnisotropy = Math.min(renderer.capabilities.getMaxAnisotropy() || 1, 8);
+    sharedReededBump.anisotropy = maxAnisotropy;
+
     // 4. OrbitControls: Full 360° Interactive Camera System
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
     controls.minDistance = 3.5;
     controls.maxDistance = 25.0;
-    // Keep camera above floor plane to prevent ground clipping
     controls.maxPolarAngle = Math.PI / 2 - 0.03;
-    controls.minPolarAngle = 0.08; // Can view looking down from top
+    controls.minPolarAngle = 0.08;
     controls.target.set(0, 0.75, 0);
-    // Smooth touch controls
     controls.touches = {
       ONE: THREE.TOUCH.ROTATE,
       TWO: THREE.TOUCH.DOLLY_PAN
     };
 
-    // When user manually manipulates camera, cancel preset animation & update active state
     controls.addEventListener('start', () => {
       isTransitioningCameraRef.current = false;
       setActivePreset('custom');
@@ -479,7 +489,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     controlsRef.current = controls;
 
-    // 5. Complete 360° Lighting (Front, Rear, Top, Rim)
+    // 5. Complete 360° Lighting with NormalBias (Eliminates shadow edge-shuttering!)
     const ambientLight = new THREE.AmbientLight(0x0b1714, 2.2);
     scene.add(ambientLight);
 
@@ -491,7 +501,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     mainKeyLight.shadow.mapSize.height = 1024;
     mainKeyLight.shadow.camera.near = 0.5;
     mainKeyLight.shadow.camera.far = 30;
-    mainKeyLight.shadow.bias = -0.0005;
+    // normalBias prevents shadow-acne on curved coin rims!
+    mainKeyLight.shadow.bias = -0.0002;
+    mainKeyLight.shadow.normalBias = 0.02;
     scene.add(mainKeyLight);
 
     // Teal Front-Left Backlight
@@ -504,12 +516,14 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     violetFillLight.position.set(10, -3, 6);
     scene.add(violetFillLight);
 
-    // Rear Specular Key Light (Illuminates coins and back-pedestals when orbiting 360°)
+    // Rear Specular Key Light with normalBias
     const rearKeyLight = new THREE.DirectionalLight(0x7090b0, 2.2);
     rearKeyLight.position.set(0, 10, -12);
     rearKeyLight.castShadow = true;
     rearKeyLight.shadow.mapSize.width = 1024;
     rearKeyLight.shadow.mapSize.height = 1024;
+    rearKeyLight.shadow.bias = -0.0002;
+    rearKeyLight.shadow.normalBias = 0.02;
     scene.add(rearKeyLight);
 
     // Dynamic spotlight tracking focused coin
@@ -518,37 +532,233 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     scene.add(activeSpotlight);
     activeSpotlightRef.current = activeSpotlight;
 
-    // Background floating dust particles
-    const particleCount = 90;
+    // 5.5 Cosmic Nebula Skybox & Starburst Field (Camera-centered skybox group so zooming/panning never clips)
+    const skyboxGroup = new THREE.Group();
+    skyboxGroup.position.copy(camera.position);
+    scene.add(skyboxGroup);
+
+    const nebulaUniforms = {
+      uTime: { value: 0 }
+    };
+
+    const nebulaGeo = new THREE.SphereGeometry(50, 40, 40);
+    const nebulaMat = new THREE.ShaderMaterial({
+      uniforms: nebulaUniforms,
+      side: THREE.BackSide,
+      depthWrite: false,
+      depthTest: false,
+      fog: false,
+      vertexShader: `
+        varying vec3 vWorldDir;
+        void main() {
+          vWorldDir = normalize(mat3(modelMatrix) * position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        varying vec3 vWorldDir;
+
+        float hash(vec3 p) {
+          p = fract(p * 0.3183099 + 0.1);
+          p *= 17.0;
+          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+
+        float noise(vec3 x) {
+          vec3 i = floor(x);
+          vec3 f = fract(x);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(
+            mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y),
+            f.z
+          );
+        }
+
+        float fbm(vec3 p) {
+          float v = 0.0;
+          float a = 0.5;
+          for (int i = 0; i < 5; i++) {
+            v += a * noise(p);
+            p = p * 2.03 + vec3(0.13, -0.17, 0.21);
+            a *= 0.5;
+          }
+          return v;
+        }
+
+        void main() {
+          vec3 d = normalize(vWorldDir);
+          float t = uTime * 0.035;
+
+          // Diagonal galactic plane coordinate matching reference image
+          float diagBand = exp(-pow((d.y - d.x * 0.65) * 1.75, 2.0));
+
+          // Domain-warped FBM clouds
+          vec3 q = vec3(
+            fbm(d * 2.4 + vec3(t, -t * 0.6, 0.0)),
+            fbm(d * 2.4 + vec3(1.4, 2.9, -t * 0.5)),
+            fbm(d * 2.4 + vec3(-2.1, t * 0.4, 1.7))
+          );
+          float cloud = fbm(d * 3.0 + q * 1.45 + vec3(t * 0.4));
+          float wisps = smoothstep(0.26, 0.78, cloud) * (0.42 + 0.75 * diagBand);
+
+          // Deep cosmic base
+          vec3 col = vec3(0.012, 0.014, 0.032);
+
+          // Lower-left celestial blue/indigo nebula
+          float blueMask = smoothstep(-0.65, 0.55, -d.x * 0.5 - d.y * 0.35 + (q.x - 0.45));
+          vec3 blueNebula = mix(vec3(0.08, 0.18, 0.42), vec3(0.28, 0.50, 0.86), cloud);
+          col += blueNebula * wisps * blueMask * 1.15;
+
+          // Upper-right magenta/rose/violet nebula
+          float pinkMask = smoothstep(-0.45, 0.65, d.x * 0.55 + d.y * 0.45 + (q.y - 0.45));
+          vec3 pinkNebula = mix(vec3(0.36, 0.11, 0.38), vec3(0.82, 0.36, 0.62), cloud);
+          col += pinkNebula * wisps * pinkMask * 1.15;
+
+          // Warm amber/gold stellar dust core highlights
+          float coreDust = pow(max(0.0, cloud * diagBand), 2.6);
+          col += vec3(0.90, 0.56, 0.38) * coreDust * 0.55;
+
+          // Dark dust lane filament contrast
+          float darkLane = smoothstep(0.45, 0.68, fbm(d * 4.5 - q * 0.8));
+          col *= mix(1.0, 0.52, darkLane * diagBand * 0.65);
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `
+    });
+    const nebulaMesh = new THREE.Mesh(nebulaGeo, nebulaMat);
+    nebulaMesh.renderOrder = -20;
+    nebulaMesh.frustumCulled = false;
+    skyboxGroup.add(nebulaMesh);
+
+    // Multi-layered Starfield with Twinkle & Diffraction Spikes
+    const particleCount = 1450;
     const particleGeo = new THREE.BufferGeometry();
     const particlePositions = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount * 3; i += 3) {
-      particlePositions[i] = (Math.random() - 0.5) * 32;
-      particlePositions[i + 1] = Math.random() * 14 - 2;
-      particlePositions[i + 2] = (Math.random() - 0.5) * 20 - 5;
+    const particleColors = new Float32Array(particleCount * 3);
+    const particleSizes = new Float32Array(particleCount);
+    const particleSeeds = new Float32Array(particleCount);
+
+    const starPalette = [
+      new THREE.Color(0xffffff), // Pure white
+      new THREE.Color(0xa8ccff), // Celestial blue-white
+      new THREE.Color(0x74a8ff), // Deep sapphire blue
+      new THREE.Color(0xffcfa0), // Warm gold/amber
+      new THREE.Color(0xffa8d8)  // Nebula rose-pink
+    ];
+
+    for (let i = 0; i < particleCount; i++) {
+      // Concentrate 55% of stars along the diagonal nebula band, 45% all-sky
+      const inBand = i < particleCount * 0.55;
+      const radius = 26 + Math.random() * 20;
+      let u = (Math.random() - 0.5) * 2;
+      let v = (Math.random() - 0.5) * 2;
+      let w = (Math.random() - 0.5) * 2;
+      if (inBand) {
+        // Bias toward y ~= x * 0.65 diagonal plane
+        v = u * 0.65 + (Math.random() - 0.5) * 0.65;
+      }
+      const len = Math.hypot(u, v, w) || 1;
+      particlePositions[i * 3] = (u / len) * radius;
+      particlePositions[i * 3 + 1] = (v / len) * radius;
+      particlePositions[i * 3 + 2] = (w / len) * radius;
+
+      const c = starPalette[Math.floor(Math.random() * starPalette.length)];
+      particleColors[i * 3] = c.r;
+      particleColors[i * 3 + 1] = c.g;
+      particleColors[i * 3 + 2] = c.b;
+
+      // Occasional hero diffraction flare stars (like the reference image)
+      const isHeroStar = i < 32;
+      particleSizes[i] = isHeroStar ? (28.0 + Math.random() * 22.0) : (3.5 + Math.pow(Math.random(), 2.4) * 12.0);
+      particleSeeds[i] = Math.random() * 100.0;
     }
+
     particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    const particleMat = new THREE.PointsMaterial({
-      color: 0x68ffe0,
-      size: 0.05,
+    particleGeo.setAttribute('aColor', new THREE.BufferAttribute(particleColors, 3));
+    particleGeo.setAttribute('aSize', new THREE.BufferAttribute(particleSizes, 1));
+    particleGeo.setAttribute('aSeed', new THREE.BufferAttribute(particleSeeds, 1));
+
+    const particleMat = new THREE.ShaderMaterial({
+      uniforms: nebulaUniforms,
       transparent: true,
-      opacity: 0.4,
-      blending: THREE.AdditiveBlending
+      depthWrite: false,
+      fog: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `
+        attribute vec3 aColor;
+        attribute float aSize;
+        attribute float aSeed;
+        uniform float uTime;
+        varying vec3 vColor;
+        varying float vTwinkle;
+        varying float vIsHero;
+
+        void main() {
+          vColor = aColor;
+          vIsHero = step(22.0, aSize);
+          float speed = 1.4 + mod(aSeed, 3.2);
+          vTwinkle = 0.65 + 0.35 * sin(uTime * speed + aSeed * 6.2831);
+
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = aSize * vTwinkle * (22.0 / max(1.0, -mvPosition.z));
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vTwinkle;
+        varying float vIsHero;
+
+        void main() {
+          vec2 uv = gl_PointCoord - vec2(0.5);
+          float d = length(uv);
+          if (d > 0.5) discard;
+
+          // Soft radial star core
+          float core = exp(-d * d * 28.0);
+          float halo = smoothstep(0.5, 0.0, d) * 0.35;
+          float brightness = core + halo;
+
+          // 4-point + diagonal diffraction spikes on bright hero stars
+          if (vIsHero > 0.5) {
+            float spikeH = exp(-abs(uv.y) * 36.0) * smoothstep(0.5, 0.0, abs(uv.x));
+            float spikeV = exp(-abs(uv.x) * 36.0) * smoothstep(0.5, 0.0, abs(uv.y));
+            vec2 rotUv = vec2(uv.x + uv.y, uv.x - uv.y) * 0.7071;
+            float spikeD = (exp(-abs(rotUv.y) * 48.0) + exp(-abs(rotUv.x) * 48.0)) * smoothstep(0.35, 0.0, d) * 0.45;
+            brightness += (spikeH + spikeV) * 0.85 + spikeD;
+          }
+
+          vec3 finalColor = mix(vColor, vec3(1.0), clamp(core * 0.75, 0.0, 1.0));
+          gl_FragColor = vec4(finalColor, clamp(brightness * vTwinkle, 0.0, 1.0));
+        }
+      `
     });
     const particles = new THREE.Points(particleGeo, particleMat);
-    scene.add(particles);
+    particles.renderOrder = -19;
+    particles.frustumCulled = false;
+    skyboxGroup.add(particles);
 
-    // 6. Shared Geometries
-    const coinGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.25, 48);
-    const pedestalGeo = new THREE.BoxGeometry(1.6, 0.9, 2.1);
-    const grooveGeo = new THREE.BoxGeometry(0.38, 0.32, 1.7);
+    // 6. Shared Geometries (64 radial segments for ultra-smooth silhouette rim)
+    const coinGeo = new THREE.CylinderGeometry(1.18, 1.18, 0.25, 64);
+    const pedestalGeo = new THREE.BoxGeometry(1.6, 0.86, 2.1);
+    const grooveGeo = new THREE.BoxGeometry(0.38, 0.30, 1.7);
     const ledGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.06, 24);
     ledGeo.rotateX(Math.PI / 2);
     const streakGeo = new THREE.PlaneGeometry(0.48, 0.7);
     const emptyGlowGeo = new THREE.RingGeometry(0.2, 0.7, 24);
     const haloGeo = new THREE.PlaneGeometry(1.5, 1.5);
 
-    // Shared materials
+    // Stationary invisible Hit-Proxy Geometry for stable, jitter-free raycasting
+    const hitProxyGeo = new THREE.CylinderGeometry(1.28, 1.28, 0.45, 24);
+    hitProxyGeo.rotateX(Math.PI / 2);
+    const hitProxyMat = new THREE.MeshBasicMaterial({ visible: false });
+
+    // Shared materials with polygonOffset on groove to eliminate coplanar Z-fighting
     const pedestalMat = new THREE.MeshStandardMaterial({
       color: 0x0b1714,
       metalness: 0.7,
@@ -556,7 +766,10 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     });
     const grooveMat = new THREE.MeshStandardMaterial({
       color: 0x030706,
-      roughness: 0.95
+      roughness: 0.95,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
     });
 
     // 7. Conveyor Group
@@ -596,14 +809,31 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     const items: Array<{
       group: THREE.Group;
       coinMesh: THREE.Mesh;
+      hitProxy: THREE.Mesh;
       haloMesh: THREE.Mesh;
       emptyGlowMesh: THREE.Mesh;
       feature: CoinFeature;
       index: number;
       baseX: number;
+      hoverProgress: number;
+      colorObj: THREE.Color;
     }> = [];
 
-    const interactiveCoins: THREE.Mesh[] = [];
+    // Track all per-coin textures and materials for complete GPU disposal on unmount
+    const disposableTextures: THREE.Texture[] = [];
+    const disposableMaterials: THREE.Material[] = [
+      nebulaMat,
+      particleMat,
+      pedestalMat,
+      grooveMat,
+      hitProxyMat,
+      rackBaseMat,
+      edgeNeonMat,
+      rearNeonMat
+    ];
+
+    // Stationary proxies for raycasting (prevents animation feedback loop!)
+    const interactiveHitProxies: THREE.Mesh[] = [];
 
     COIN_FEATURES.forEach((feature, idx) => {
       const posX = START_X + idx * SPACING;
@@ -616,13 +846,14 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       blockMesh.receiveShadow = true;
       pedestalGroup.add(blockMesh);
 
-      // Slot groove
+      // Slot groove with distinct depth
       const grooveMesh = new THREE.Mesh(grooveGeo, grooveMat);
-      grooveMesh.position.set(0, 0.38, 0);
+      grooveMesh.position.set(0, 0.36, 0);
       pedestalGroup.add(grooveMesh);
 
       // Front LED indicator
       const ledMat = new THREE.MeshBasicMaterial({ color: feature.ledColor });
+      disposableMaterials.push(ledMat);
       const ledMesh = new THREE.Mesh(ledGeo, ledMat);
       ledMesh.position.set(0, -0.08, 1.06);
       pedestalGroup.add(ledMesh);
@@ -632,7 +863,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       rearLedMesh.position.set(0, -0.08, -1.06);
       pedestalGroup.add(rearLedMesh);
 
-      // Vertical light streak
+      // Vertical light streak (depthWrite: false to prevent sorting artifacts)
       const streakCanvas = document.createElement('canvas');
       streakCanvas.width = 64;
       streakCanvas.height = 128;
@@ -643,24 +874,30 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       sCtx.fillStyle = sGrad;
       sCtx.fillRect(0, 0, 64, 128);
       const streakTex = new THREE.CanvasTexture(streakCanvas);
-      streakTex.generateMipmaps = false;
+      streakTex.generateMipmaps = true;
+      streakTex.minFilter = THREE.LinearMipmapLinearFilter;
+      disposableTextures.push(streakTex);
       const streakMat = new THREE.MeshBasicMaterial({
         map: streakTex,
         transparent: true,
         opacity: 0.7,
-        blending: THREE.AdditiveBlending
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
       });
+      disposableMaterials.push(streakMat);
       const streakMesh = new THREE.Mesh(streakGeo, streakMat);
       streakMesh.position.set(0, -0.5, 1.06);
       pedestalGroup.add(streakMesh);
 
-      // Ghostly empty slot glow indicator
+      // Ghostly empty slot glow indicator (depthWrite: false)
       const emptyGlowMat = new THREE.MeshBasicMaterial({
         color: feature.color,
         transparent: true,
         opacity: 0.0,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        depthWrite: false
       });
+      disposableMaterials.push(emptyGlowMat);
       const emptyGlowMesh = new THREE.Mesh(emptyGlowGeo, emptyGlowMat);
       emptyGlowMesh.rotation.x = -Math.PI / 2;
       emptyGlowMesh.position.set(0, 0.42, 0);
@@ -668,35 +905,52 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
       coinsGroup.add(pedestalGroup);
 
+      // Stationary invisible Hit Proxy Collider (STATIONARY IN SLOT - ZERO BOUNCING!)
+      const hitProxy = new THREE.Mesh(hitProxyGeo, hitProxyMat);
+      hitProxy.position.set(posX, 0.9, 0);
+      hitProxy.userData = { feature, index: idx };
+      coinsGroup.add(hitProxy);
+      interactiveHitProxies.push(hitProxy);
+
       // 3D Coin Mesh Group
       const coinGroup = new THREE.Group();
       coinGroup.position.set(posX, 0.7, 0);
 
       const frontFaceTex = createCoinFaceTexture(feature);
       const backFaceTex = createCoinBackFaceTexture(feature);
+      frontFaceTex.anisotropy = maxAnisotropy;
+      backFaceTex.anisotropy = maxAnisotropy;
+      disposableTextures.push(frontFaceTex, backFaceTex);
 
-      // Fluted edge material
+      const coinColorObj = new THREE.Color(feature.color);
+
+      // Fluted edge material: controlled bumpScale (0.025) and roughness (0.24) eliminates edge sparkle!
       const edgeMat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(feature.color),
-        metalness: 0.92,
-        roughness: 0.18,
+        color: coinColorObj,
+        metalness: 0.88,
+        roughness: 0.24,
         bumpMap: sharedReededBump,
-        bumpScale: 0.09
+        bumpScale: 0.025
       });
 
       // Front face material
       const frontFaceMat = new THREE.MeshStandardMaterial({
         map: frontFaceTex,
-        metalness: 0.48,
-        roughness: 0.28
+        metalness: 0.45,
+        roughness: 0.32,
+        depthTest: true,
+        depthWrite: true
       });
 
       // Back face material
       const backFaceMat = new THREE.MeshStandardMaterial({
         map: backFaceTex,
-        metalness: 0.52,
-        roughness: 0.25
+        metalness: 0.48,
+        roughness: 0.30,
+        depthTest: true,
+        depthWrite: true
       });
+      disposableMaterials.push(edgeMat, frontFaceMat, backFaceMat);
 
       // CylinderGeometry: [0]: side rim, [1]: top/front cap, [2]: bottom/back cap
       const coinMesh = new THREE.Mesh(coinGeo, [edgeMat, frontFaceMat, backFaceMat]);
@@ -706,9 +960,8 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       coinMesh.userData = { feature, index: idx };
 
       coinGroup.add(coinMesh);
-      interactiveCoins.push(coinMesh);
 
-      // Upward spotlight halo underneath coin
+      // Upward spotlight halo underneath coin (depthWrite: false eliminates Z-sorting pop!)
       const haloCanvas = document.createElement('canvas');
       haloCanvas.width = 128;
       haloCanvas.height = 128;
@@ -720,13 +973,17 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       hCtx.fillStyle = hGrad;
       hCtx.fillRect(0, 0, 128, 128);
       const haloTex = new THREE.CanvasTexture(haloCanvas);
-      haloTex.generateMipmaps = false;
+      haloTex.generateMipmaps = true;
+      haloTex.minFilter = THREE.LinearMipmapLinearFilter;
+      disposableTextures.push(haloTex);
       const haloMat = new THREE.MeshBasicMaterial({
         map: haloTex,
         transparent: true,
         opacity: 0.0,
-        blending: THREE.AdditiveBlending
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
       });
+      disposableMaterials.push(haloMat);
       const haloMesh = new THREE.Mesh(haloGeo, haloMat);
       haloMesh.rotation.x = -Math.PI / 2;
       haloMesh.position.y = -0.58;
@@ -737,11 +994,14 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       items.push({
         group: coinGroup,
         coinMesh,
+        hitProxy,
         haloMesh,
         emptyGlowMesh,
         feature,
         index: idx,
-        baseX: posX
+        baseX: posX,
+        hoverProgress: 0.0,
+        colorObj: coinColorObj
       });
     });
 
@@ -771,7 +1031,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         -((e.clientY - rect.top) / rect.height) * 2 + 1
       );
       raycaster.setFromCamera(mouseVector, camera);
-      const intersects = raycaster.intersectObjects(interactiveCoins, false);
+      const intersects = raycaster.intersectObjects(interactiveHitProxies, false);
       if (intersects.length > 0) {
         pointerDownHitCoin = intersects[0].object.userData.feature as CoinFeature;
         pointerDownHitIndex = intersects[0].object.userData.index as number;
@@ -781,20 +1041,22 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       }
     };
 
+    let pointerDirty = false;
+
     const handlePointerMove = (e: PointerEvent) => {
       const rect = dom.getBoundingClientRect();
       pointerNormRef.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       pointerNormRef.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       isPointerInsideRef.current = true;
+      pointerDirty = true;
     };
 
     const handlePointerUp = (e: PointerEvent) => {
       const dist = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
       const duration = performance.now() - pointerDownTime;
 
-      // Strict Click Discrimination: movement must be under 6 pixels and under 550ms
-      if (dist < 6 && duration < 550 && pointerDownHitCoin) {
-        // Legitimate intentional single CLICK on a coin!
+      // Strict Click Discrimination: movement must be under 6 pixels and under 500ms
+      if (dist < 6 && duration < 500 && pointerDownHitCoin) {
         if (!removedCoinsRef.current.has(pointerDownHitCoin.id)) {
           triggerCoinSelection(pointerDownHitCoin.id);
         }
@@ -811,7 +1073,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         -((e.clientY - rect.top) / rect.height) * 2 + 1
       );
       raycaster.setFromCamera(mouseVector, camera);
-      const intersects = raycaster.intersectObjects(interactiveCoins, false);
+      const intersects = raycaster.intersectObjects(interactiveHitProxies, false);
       if (intersects.length > 0) {
         const hitIdx = intersects[0].object.userData.index as number;
         focusCoinCamera(hitIdx);
@@ -832,7 +1094,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     dom.addEventListener('pointerleave', handlePointerLeave);
 
     // =========================================================================
-    // 9. MASTER ANIMATION LOOP (LOCKED 60 FPS, FRAME-INDEPENDENT DAMPING)
+    // 9. MASTER ANIMATION LOOP (LOCKED 60 FPS, JITTER-FREE DAMPING)
     // =========================================================================
     let clock = new THREE.Clock();
     let frameCounter = 0;
@@ -878,7 +1140,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       }
 
       // Update OrbitControls
-      controls.update();
+      const controlsMoved = controls.update();
 
       // --- 2. Conveyor Smooth Damping ---
       const targetPos = targetPosRef.current;
@@ -894,22 +1156,31 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         setActiveUiIndex(roundedIndex);
       }
 
-      // --- 3. Dynamic Spotlight Tracking ---
+      // --- 3. Dynamic Spotlight Tracking (Zero per-frame Color allocation) ---
       if (activeSpotlightRef.current) {
         const focusX = START_X + currentPos * SPACING;
-        const activeColor = new THREE.Color(COIN_FEATURES[roundedIndex].color);
-        activeSpotlightRef.current.color.lerp(activeColor, 0.15);
+        const activeColor = items[roundedIndex]?.colorObj;
+        if (activeColor) {
+          activeSpotlightRef.current.color.lerp(activeColor, 0.15);
+        }
         activeSpotlightRef.current.position.x += (focusX - activeSpotlightRef.current.position.x) * (1.0 - Math.exp(-14.0 * delta));
       }
 
-      // --- 4. Background Particle Animation ---
-      particles.rotation.y = elapsedTime * 0.02;
+      // --- 4. Cosmic Nebula & Starfield Animation (Follows camera to prevent far-plane clipping) ---
+      skyboxGroup.position.copy(camera.position);
+      if (isPlayingRef.current) {
+        nebulaUniforms.uTime.value = elapsedTime;
+        particles.rotation.y = elapsedTime * 0.012;
+        particles.rotation.z = Math.sin(elapsedTime * 0.05) * 0.025;
+        nebulaMesh.rotation.y = elapsedTime * 0.008;
+      }
 
-      // --- 5. Optimized Raycasting (Once per frame, only interactive coins) ---
-      if (isPointerInsideRef.current) {
+      // --- 5. Event-Driven Raycasting (Only raycast when pointer or camera moved) ---
+      if (isPointerInsideRef.current && (pointerDirty || controlsMoved || isTransitioningCameraRef.current)) {
+        pointerDirty = false;
         mouseVector.set(pointerNormRef.current.x, pointerNormRef.current.y);
         raycaster.setFromCamera(mouseVector, camera);
-        const intersects = raycaster.intersectObjects(interactiveCoins, false);
+        const intersects = raycaster.intersectObjects(interactiveHitProxies, false);
 
         if (intersects.length > 0) {
           const hitIdx = intersects[0].object.userData.index;
@@ -927,15 +1198,20 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         }
       }
 
-      // --- 6. Transform Every Coin ---
+      // --- 6. Transform Every Coin with Per-Coin Continuous Hover Easing ---
       const isPlayingLoop = isPlayingRef.current;
       const pickingUpId = pickingUpIdRef.current;
       const removedCoinsSet = removedCoinsRef.current;
 
-      items.forEach(({ group, haloMesh, emptyGlowMesh, feature, index }) => {
+      items.forEach((item) => {
+        const { group, haloMesh, emptyGlowMesh, feature, index } = item;
         const isRemoved = removedCoinsSet.has(feature.id);
         const isBeingPickedUp = pickingUpId === feature.id;
         const isHovered = hoveredCoinIndexRef.current === index;
+
+        // Smooth continuous hover easing: 0.0 (resting) to 1.0 (fully elevated)
+        const hoverTarget = (isHovered && !isRemoved) ? 1.0 : 0.0;
+        item.hoverProgress += (hoverTarget - item.hoverProgress) * (1.0 - Math.exp(-10.0 * delta));
 
         // Continuous distance from floating conveyor cursor
         const distFromFocus = Math.abs(currentPos - index);
@@ -950,13 +1226,13 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         group.visible = true;
         (emptyGlowMesh.material as THREE.MeshBasicMaterial).opacity = 0.0;
 
-        // Elevation calculation
+        // Elevation calculation: Smoothly incorporates hoverProgress without any abrupt jumps
         let targetY = 0.65;
         if (isBeingPickedUp) {
           pickingUpProgressRef.current = Math.min(1.0, pickingUpProgressRef.current + delta * 2.5);
           targetY = 0.65 + pickingUpProgressRef.current * 2.5;
         } else {
-          targetY = 0.65 + proximity * 0.95 + (isHovered ? 0.35 : 0.0);
+          targetY = 0.65 + proximity * 0.95 + item.hoverProgress * 0.32;
         }
 
         group.position.y += (targetY - group.position.y) * (1.0 - Math.exp(-14.0 * delta));
@@ -969,9 +1245,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
           group.position.y += idleWave * proximity;
         }
 
-        // Camera tilt & scaling based on proximity
-        let targetRotX = -0.14 * proximity;
-        let targetScale = 1.0 + 0.06 * proximity;
+        // Camera tilt & scaling based on proximity and smooth hover progress
+        let targetRotX = -0.14 * proximity - 0.05 * item.hoverProgress;
+        let targetScale = 1.0 + 0.05 * proximity + 0.03 * item.hoverProgress;
 
         if (isBeingPickedUp) {
           targetRotX = -0.3;
@@ -982,9 +1258,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         group.rotation.x += (targetRotX - group.rotation.x) * (1.0 - Math.exp(-12.0 * delta));
         group.scale.set(targetScale, targetScale, targetScale);
 
-        // Halo opacity underneath
+        // Halo opacity underneath (depthWrite: false ensures zero Z-fighting with slot faces)
         if (haloMesh && haloMesh.material instanceof THREE.MeshBasicMaterial) {
-          const targetHaloOpacity = isBeingPickedUp ? 1.0 : (proximity * 0.85 + (isHovered ? 0.35 : 0.0));
+          const targetHaloOpacity = isBeingPickedUp ? 1.0 : (proximity * 0.85 + item.hoverProgress * 0.35);
           haloMesh.material.opacity += (targetHaloOpacity - haloMesh.material.opacity) * (1.0 - Math.exp(-12.0 * delta));
         }
       });
@@ -1018,6 +1294,11 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
       controls.dispose();
 
+      // Dispose all geometries
+      nebulaGeo.dispose();
+      particleGeo.dispose();
+      rackBaseGeo.dispose();
+      edgeNeonGeo.dispose();
       coinGeo.dispose();
       pedestalGeo.dispose();
       grooveGeo.dispose();
@@ -1025,9 +1306,11 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       streakGeo.dispose();
       emptyGlowGeo.dispose();
       haloGeo.dispose();
-      pedestalMat.dispose();
-      grooveMat.dispose();
-      sharedReededBump.dispose();
+      hitProxyGeo.dispose();
+
+      // Dispose all materials and canvas textures
+      disposableMaterials.forEach(mat => mat.dispose());
+      disposableTextures.forEach(tex => tex.dispose());
 
       if (dom.parentNode) {
         dom.parentNode.removeChild(dom);
@@ -1046,11 +1329,11 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
   const activeFeature = COIN_FEATURES[activeUiIndex] || COIN_FEATURES[0];
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#050A0B] select-none text-slate-100">
-      {/* 1. Cinematic Background Vignette & Gradients */}
-      <div className="absolute inset-0 bg-radial from-transparent via-[#050A0B]/60 to-[#050A0B] pointer-events-none z-0" />
-      <div className="absolute top-0 left-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+    <div className="relative w-screen h-screen overflow-hidden bg-[#03040A] select-none text-slate-100">
+      {/* 1. Cinematic Cosmic Vignette & Nebula Ambient Glows */}
+      <div className="absolute inset-0 bg-radial from-transparent via-transparent to-[#03040A]/80 pointer-events-none z-15" />
+      <div className="absolute top-0 right-0 w-[34rem] h-[34rem] bg-fuchsia-600/10 rounded-full blur-3xl pointer-events-none z-15" />
+      <div className="absolute bottom-0 left-0 w-[34rem] h-[34rem] bg-blue-600/10 rounded-full blur-3xl pointer-events-none z-15" />
 
       {/* 2. Top Cinematic Header Bar */}
       <header className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between pointer-events-none">
