@@ -162,11 +162,11 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       {/* Title & Top Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">
             {title}
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {description} • {total} total records
+          <p className="text-xs font-bold text-slate-300 mt-0.5">
+            {description} • <span className="text-emerald-300 font-extrabold">{total} total records</span>
           </p>
         </div>
 
@@ -175,15 +175,15 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
           <a
             href={api.exportCsvUrl(documentType || 'invoices', { status: statusFilter, category: categoryFilter })}
             download
-            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#152e23] text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-[#091813]/80 text-slate-100 hover:bg-[#152e23] text-xs font-extrabold flex items-center gap-1.5 transition-colors"
           >
-            <Download className="size-3.5" />
+            <Download className="size-3.5 text-emerald-400" />
             <span>Export CSV</span>
           </a>
 
           <button
             onClick={onOpenUpload}
-            className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-md shadow-emerald-950/50 cursor-pointer transition-all"
           >
             + Upload New
           </button>
@@ -292,7 +292,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       <WorkspaceCard spotlightColor={spotlightColor} className="!p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-[#11241c] text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold border-b border-slate-200 dark:border-[#193627]">
+            <thead className="bg-[#0d221a]/90 text-emerald-300/90 uppercase text-[11px] font-extrabold tracking-wider border-b border-emerald-500/20">
               <tr>
                 <th className="py-3 px-3 w-8">
                   <input
@@ -303,27 +303,27 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                   />
                 </th>
                 <th className="py-3 px-3">
-                  <button onClick={() => toggleSort('filename')} className="flex items-center gap-1 cursor-pointer">
+                  <button onClick={() => toggleSort('filename')} className="flex items-center gap-1 cursor-pointer font-extrabold">
                     <span>Document</span>
                     <ArrowUpDown className="size-3" />
                   </button>
                 </th>
                 <th className="py-3 px-3">
-                  <button onClick={() => toggleSort('vendor')} className="flex items-center gap-1 cursor-pointer">
+                  <button onClick={() => toggleSort('vendor')} className="flex items-center gap-1 cursor-pointer font-extrabold">
                     <span>Vendor</span>
                     <ArrowUpDown className="size-3" />
                   </button>
                 </th>
                 <th className="py-3 px-3">Invoice #</th>
                 <th className="py-3 px-3">
-                  <button onClick={() => toggleSort('date')} className="flex items-center gap-1 cursor-pointer">
+                  <button onClick={() => toggleSort('date')} className="flex items-center gap-1 cursor-pointer font-extrabold">
                     <span>Date</span>
                     <ArrowUpDown className="size-3" />
                   </button>
                 </th>
                 <th className="py-3 px-3">Category</th>
                 <th className="py-3 px-3">
-                  <button onClick={() => toggleSort('amount')} className="flex items-center gap-1 cursor-pointer">
+                  <button onClick={() => toggleSort('amount')} className="flex items-center gap-1 cursor-pointer font-extrabold">
                     <span>Amount</span>
                     <ArrowUpDown className="size-3" />
                   </button>
@@ -332,13 +332,13 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                 <th className="py-3 px-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#152e23]">
+            <tbody className="divide-y divide-white/10">
               {items.length > 0 ? (
                 items.map((doc) => (
                   <tr
                     key={doc.id}
                     onClick={() => onOpenReview(doc.id)}
-                    className="hover:bg-slate-50 dark:hover:bg-[#11241c]/60 cursor-pointer transition-colors"
+                    className="hover:bg-emerald-500/10 cursor-pointer transition-colors"
                   >
                     <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -348,33 +348,33 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                         className="rounded text-emerald-600 focus:ring-emerald-500"
                       />
                     </td>
-                    <td className="py-3 px-3 font-medium text-slate-900 dark:text-white max-w-xs">
+                    <td className="py-3 px-3 font-extrabold text-white max-w-xs">
                       <div className="flex items-center gap-1.5 truncate">
-                        <FileText className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <FileText className="size-3.5 text-emerald-400 shrink-0" />
                         <span className="truncate">{doc.original_filename}</span>
                         {doc.is_duplicate === 1 && (
-                          <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-500 border border-rose-500/30">
+                          <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/30">
                             DUP
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-3 font-medium text-slate-700 dark:text-slate-300">
+                    <td className="py-3 px-3 font-bold text-slate-100">
                       {doc.vendor_name || <span className="text-slate-400 italic">Unidentified</span>}
                     </td>
-                    <td className="py-3 px-3 font-mono text-slate-500 dark:text-slate-400">
+                    <td className="py-3 px-3 font-mono font-bold text-slate-200">
                       {doc.invoice_number || '—'}
                     </td>
-                    <td className="py-3 px-3 font-mono text-slate-500 dark:text-slate-400">
+                    <td className="py-3 px-3 font-mono font-bold text-slate-200">
                       {doc.invoice_date || doc.created_at.slice(0, 10)}
                     </td>
                     <td className="py-3 px-3">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-[#152e23] text-slate-700 dark:text-slate-300">
-                        <Tag className="size-2.5 text-emerald-500" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-[#152e23] text-emerald-300 border border-emerald-500/25">
+                        <Tag className="size-2.5 text-emerald-400" />
                         <span>{doc.category || 'Other'}</span>
                       </span>
                     </td>
-                    <td className="py-3 px-3 font-mono font-bold text-slate-900 dark:text-white">
+                    <td className="py-3 px-3 font-mono font-black text-white">
                       {doc.total_amount !== null && doc.total_amount !== undefined
                         ? `${doc.currency && doc.currency !== 'USD' ? `${doc.currency} ` : '$'}${doc.total_amount.toFixed(2)}`
                         : <span className="text-slate-400">—</span>}

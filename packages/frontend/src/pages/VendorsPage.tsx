@@ -88,10 +88,10 @@ export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSe
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">
             Vendor Directory
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-bold text-slate-300 mt-0.5">
             Track merchant profiles, total lifetime spending, and manage duplicates
           </p>
         </div>
@@ -139,36 +139,36 @@ export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSe
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="size-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs uppercase">
+                <div className="size-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 flex items-center justify-center font-extrabold text-xs uppercase">
                   {v.name.slice(0, 2)}
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">
+                  <h3 className="font-extrabold text-sm text-white group-hover:text-emerald-400 transition-colors">
                     {v.name}
                   </h3>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-xs font-bold text-emerald-300/90">
                     {v.default_category || 'Uncategorized'}
                   </span>
                 </div>
               </div>
-              <ExternalLink className="size-3.5 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+              <ExternalLink className="size-3.5 text-slate-300 group-hover:text-emerald-400 transition-colors" />
             </div>
 
-            <div className="pt-2 border-t border-slate-100 dark:border-[#152e23] flex items-center justify-between text-xs">
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
               <div>
-                <span className="text-slate-400 text-[10px] uppercase font-bold block">Lifetime Spend</span>
+                <span className="text-slate-300 text-[10px] uppercase font-extrabold tracking-wider block">Lifetime Spend</span>
                 <CountUp
                   to={v.total_spent || 0}
                   decimals={2}
-                  prefix="$"
+                  prefix=""
                   separator=","
                   duration={1}
-                  className="font-mono font-bold text-slate-900 dark:text-white"
+                  className="font-mono font-black text-base text-white"
                 />
               </div>
               <div className="text-right">
-                <span className="text-slate-400 text-[10px] uppercase font-bold block">Invoices</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                <span className="text-slate-300 text-[10px] uppercase font-extrabold tracking-wider block">Invoices</span>
+                <span className="font-extrabold text-slate-100">
                   {v.document_count || 0} doc(s)
                 </span>
               </div>

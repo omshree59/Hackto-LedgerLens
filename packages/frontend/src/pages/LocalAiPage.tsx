@@ -205,13 +205,13 @@ export const LocalAiPage: React.FC = () => {
         {/* Left Column: Discovered Models & Configuration (5 Cols) */}
         <div className="lg:col-span-5 space-y-6">
           {/* Discovered Models Card */}
-          <div className="p-6 rounded-2xl bg-[#091513] border border-slate-800/80 shadow-xl space-y-4">
+          <WorkspaceCard spotlightColor="#00D6A0" className="!p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <h2 className="text-base font-extrabold text-white flex items-center gap-2">
                 <Terminal className="size-4 text-emerald-400" />
                 Local Ollama Models
               </h2>
-              <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+              <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-200 font-mono font-bold">
                 {status?.models.length || 0} discovered
               </span>
             </div>
@@ -273,25 +273,25 @@ export const LocalAiPage: React.FC = () => {
                 <button
                   onClick={() => handleModelSwitch(selectedModelInput)}
                   disabled={isUpdatingModel || !selectedModelInput.trim()}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Apply
                 </button>
               </div>
             </div>
-          </div>
+          </WorkspaceCard>
 
           {/* Model Inference Settings */}
-          <div className="p-6 rounded-2xl bg-[#091513] border border-slate-800/80 shadow-xl space-y-4">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
+          <WorkspaceCard spotlightColor="#B45BFF" className="!p-6 space-y-4">
+            <h2 className="text-base font-extrabold text-white flex items-center gap-2">
               <Sliders className="size-4 text-emerald-400" />
               Inference Parameters
             </h2>
 
             <div className="space-y-2">
-              <div className="flex justify-between text-xs text-slate-300">
+              <div className="flex justify-between text-xs font-bold text-slate-200">
                 <span>Temperature (Determinism)</span>
-                <span className="font-mono text-emerald-400 font-bold">{temperature}</span>
+                <span className="font-mono text-emerald-400 font-extrabold">{temperature}</span>
               </div>
               <input
                 type="range"
@@ -302,18 +302,18 @@ export const LocalAiPage: React.FC = () => {
                 onChange={e => setTemperature(parseFloat(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
               />
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] font-semibold text-slate-300">
                 Low temperature (0.05 - 0.15) provides strictly deterministic accounting JSON extractions with zero hallucination.
               </p>
             </div>
-          </div>
+          </WorkspaceCard>
         </div>
 
         {/* Right Column: Live Diagnostic Playground (7 Cols) */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="p-6 rounded-2xl bg-[#091513] border border-slate-800/80 shadow-xl space-y-4">
+          <WorkspaceCard spotlightColor="#14b8a6" className="!p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <h2 className="text-base font-extrabold text-white flex items-center gap-2">
                 <Activity className="size-4 text-emerald-400" />
                 Live Inference Playground
               </h2>
@@ -391,7 +391,7 @@ export const LocalAiPage: React.FC = () => {
                 </pre>
               </div>
             )}
-          </div>
+          </WorkspaceCard>
         </div>
       </div>
     </div>

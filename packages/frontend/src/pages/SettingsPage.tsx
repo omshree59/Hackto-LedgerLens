@@ -110,10 +110,10 @@ export const SettingsPage: React.FC = () => {
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       {/* Top Banner */}
       <div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-          Privacy & Local AI Settings
+        <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">
+          Privacy &amp; Local AI Settings
         </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs font-bold text-slate-300 mt-0.5">
           Manage local Gemma inference, inspect device storage, and control data privacy
         </p>
       </div>

@@ -94,15 +94,35 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
 
   const hasNoData = !data || data.metrics.totalDocuments === 0;
 
+  // Detect dominant currency from recent documents so KPIs & charts match the user's invoice currency
+  const dominantCurrency = data?.recentDocuments?.find(d => d.currency && d.currency !== 'USD')?.currency || 'USD';
+  const currencyPrefix = dominantCurrency === 'USD' ? '$' : `${dominantCurrency} `;
+
+  // Ensure AreaChart has at least 2 points when only 1 month exists so it draws a full curve & area fill instead of a lone dot
+  const chartMonthlyTrend = React.useMemo(() => {
+    const raw = data?.monthlyTrend || [];
+    if (raw.length === 1 && raw[0]?.month) {
+      const [yStr, mStr] = String(raw[0].month).split('-');
+      const y = parseInt(yStr, 10);
+      const m = parseInt(mStr, 10);
+      if (!Number.isNaN(y) && !Number.isNaN(m)) {
+        const prevDate = new Date(Date.UTC(y, m - 2, 1));
+        const prevMonth = `${prevDate.getUTCFullYear()}-${String(prevDate.getUTCMonth() + 1).padStart(2, '0')}`;
+        return [{ month: prevMonth, total: 0, count: 0 }, ...raw];
+      }
+    }
+    return raw;
+  }, [data?.monthlyTrend]);
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Top Banner: Date Range & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">
             Financial Dashboard
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-semibold text-slate-300 mt-0.5">
             Real-time accounting analytics parsed locally on your device
           </p>
         </div>
@@ -187,9 +207,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Invoices */}
         <WorkspaceCard spotlightColor="#00D6A0" className="space-y-3">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+          <div className="flex items-center justify-between text-slate-100 text-xs font-extrabold uppercase tracking-wider">
             <span>Total Invoices</span>
-            <div className="size-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="size-8 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 flex items-center justify-center">
               <FileText className="size-4" />
             </div>
           </div>
@@ -197,9 +217,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             <CountUp
               to={data?.metrics.totalInvoices ?? 0}
               duration={1.1}
-              className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight"
+              className="text-3xl font-black text-white tracking-tight"
             />
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-xs font-bold text-slate-300 mt-1">
               + {data?.metrics.totalReceipts ?? 0} receipts tracked
             </p>
           </div>
@@ -207,9 +227,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
 
         {/* Total Recorded Expenses */}
         <WorkspaceCard spotlightColor="#3b82f6" className="space-y-3">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+          <div className="flex items-center justify-between text-slate-100 text-xs font-extrabold uppercase tracking-wider">
             <span>Recorded Expenses</span>
-            <div className="size-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <div className="size-8 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-300 flex items-center justify-center">
               <Wallet className="size-4" />
             </div>
           </div>
@@ -217,12 +237,12 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             <CountUp
               to={data?.metrics.totalExpenses ?? 0}
               decimals={2}
-              prefix="$"
+              prefix={currencyPrefix}
               separator=","
               duration={1.25}
-              className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight"
+              className="text-3xl font-black text-white tracking-tight"
             />
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-xs font-bold text-slate-300 mt-1">
               Across {data?.metrics.expenseCount ?? 0} approved records
             </p>
           </div>
@@ -234,9 +254,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           spotlightColor="#FFB000"
           className="space-y-3 cursor-pointer group"
         >
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+          <div className="flex items-center justify-between text-slate-100 text-xs font-extrabold uppercase tracking-wider">
             <span>Awaiting Review</span>
-            <div className="size-8 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+            <div className="size-8 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-300 flex items-center justify-center">
               <AlertCircle className="size-4" />
             </div>
           </div>
@@ -245,19 +265,19 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               <CountUp
                 to={data?.metrics.awaitingReview ?? 0}
                 duration={1}
-                className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 tracking-tight"
+                className="text-3xl font-black text-amber-400 tracking-tight"
               />
-              <p className="text-[11px] text-slate-400 mt-0.5">Require human verification</p>
+              <p className="text-xs font-bold text-slate-300 mt-1">Require human verification</p>
             </div>
-            <ArrowRight className="size-4 text-slate-400 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
+            <ArrowRight className="size-4 text-slate-300 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
           </div>
         </WorkspaceCard>
 
         {/* Duplicate Candidates */}
         <WorkspaceCard spotlightColor="#f43f5e" className="space-y-3">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+          <div className="flex items-center justify-between text-slate-100 text-xs font-extrabold uppercase tracking-wider">
             <span>Duplicate Warnings</span>
-            <div className="size-8 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+            <div className="size-8 rounded-xl bg-rose-500/20 border border-rose-400/30 text-rose-300 flex items-center justify-center">
               <Copy className="size-4" />
             </div>
           </div>
@@ -265,9 +285,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             <CountUp
               to={data?.metrics.duplicateCandidates ?? 0}
               duration={1}
-              className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight"
+              className="text-3xl font-black text-white tracking-tight"
             />
-            <p className="text-[11px] text-slate-400 mt-0.5">Hash & metadata collisions</p>
+            <p className="text-xs font-bold text-slate-300 mt-1">Hash &amp; metadata collisions</p>
           </div>
         </WorkspaceCard>
       </div>
@@ -278,33 +298,42 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         <WorkspaceCard spotlightColor="#10b981" className="lg:col-span-2 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Monthly Expense Trend</h3>
-              <p className="text-[11px] text-slate-400">Total spending grouped by month from SQLite records</p>
+              <h3 className="text-base font-extrabold text-white tracking-tight">Monthly Expense Trend</h3>
+              <p className="text-xs font-semibold text-slate-300">Total spending grouped by month from SQLite records</p>
             </div>
-            <TrendingUp className="size-4 text-emerald-500" />
+            <TrendingUp className="size-4 text-emerald-400" />
           </div>
 
           <div className="h-64 w-full flex-1">
-            {data?.monthlyTrend && data.monthlyTrend.length > 0 ? (
+            {chartMonthlyTrend && chartMonthlyTrend.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.monthlyTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={chartMonthlyTrend} margin={{ top: 12, right: 16, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="emeraldGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.55} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.04} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                  <XAxis dataKey="month" stroke="#cbd5e1" fontSize={11} fontWeight={700} tickLine={false} />
+                  <YAxis stroke="#cbd5e1" fontSize={11} fontWeight={700} tickLine={false} tickFormatter={(v) => `${currencyPrefix}${v}`} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#091510', borderColor: '#193627', borderRadius: '12px', fontSize: '12px', color: '#fff' }}
-                    formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Spend']}
+                    contentStyle={{ backgroundColor: '#091510', borderColor: '#193627', borderRadius: '12px', fontSize: '12px', fontWeight: 700, color: '#fff' }}
+                    formatter={(value: any) => [`${currencyPrefix}${Number(value).toFixed(2)}`, 'Spend']}
                   />
-                  <Area type="monotone" dataKey="total" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#emeraldGradient)" />
+                  <Area
+                    type="monotone"
+                    dataKey="total"
+                    stroke="#10b981"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#emeraldGradient)"
+                    dot={{ r: 5, fill: '#10b981', stroke: '#ffffff', strokeWidth: 2 }}
+                    activeDot={{ r: 7, fill: '#34d399', stroke: '#ffffff', strokeWidth: 2 }}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+              <div className="h-full flex items-center justify-center text-xs font-bold text-slate-300">
                 No expense data recorded for this period
               </div>
             )}
@@ -314,8 +343,8 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         {/* Category Breakdown (1 col) */}
         <WorkspaceCard spotlightColor="#8b5cf6" className="flex flex-col">
           <div className="mb-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Spending by Category</h3>
-            <p className="text-[11px] text-slate-400">Top operational expense distributions</p>
+            <h3 className="text-base font-extrabold text-white tracking-tight">Spending by Category</h3>
+            <p className="text-xs font-semibold text-slate-300">Top operational expense distributions</p>
           </div>
 
           <div className="h-44 w-full">
@@ -337,31 +366,31 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#091510', borderColor: '#193627', borderRadius: '12px', fontSize: '11px', color: '#fff' }}
-                    formatter={(val: any) => [`$${Number(val).toFixed(2)}`, 'Total']}
+                    contentStyle={{ backgroundColor: '#091510', borderColor: '#193627', borderRadius: '12px', fontSize: '11px', fontWeight: 700, color: '#fff' }}
+                    formatter={(val: any) => [`${currencyPrefix}${Number(val).toFixed(2)}`, 'Total']}
                   />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+              <div className="h-full flex items-center justify-center text-xs font-bold text-slate-300">
                 No categorized expenses yet
               </div>
             )}
           </div>
 
           {/* Category Legend list */}
-          <div className="mt-3 space-y-1.5 flex-1 overflow-y-auto max-h-36 pr-1 text-xs">
+          <div className="mt-3 space-y-2 flex-1 overflow-y-auto max-h-36 pr-1 text-xs">
             {data?.spendingByCategory?.map((cat, idx) => (
-              <div key={cat.category} className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+              <div key={cat.category} className="flex items-center justify-between text-slate-100 font-bold">
                 <div className="flex items-center gap-2 truncate">
                   <span
-                    className="size-2 rounded-full shrink-0"
+                    className="size-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: CATEGORY_COLORS[idx % CATEGORY_COLORS.length] }}
                   />
-                  <span className="truncate text-[11px]">{cat.category}</span>
+                  <span className="truncate text-xs font-bold text-white">{cat.category}</span>
                 </div>
-                <span className="font-mono text-[11px] font-semibold text-slate-900 dark:text-white shrink-0">
-                  ${cat.total.toFixed(2)}
+                <span className="font-mono text-xs font-extrabold text-emerald-300 shrink-0">
+                  {currencyPrefix}{cat.total.toFixed(2)}
                 </span>
               </div>
             ))}
@@ -373,12 +402,12 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       <WorkspaceCard spotlightColor="#00D6A0" className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Recent Documents</h3>
-            <p className="text-[11px] text-slate-400">Recently imported invoices, receipts, and scans</p>
+            <h3 className="text-base font-extrabold text-white tracking-tight">Recent Documents</h3>
+            <p className="text-xs font-semibold text-slate-300">Recently imported invoices, receipts, and scans</p>
           </div>
           <button
             onClick={() => onNavigateTab('invoices')}
-            className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+            className="text-xs text-emerald-300 hover:text-emerald-200 hover:underline font-extrabold flex items-center gap-1 cursor-pointer"
           >
             <span>View All</span>
             <ArrowRight className="size-3.5" />
@@ -388,66 +417,66 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         {data?.recentDocuments && data.recentDocuments.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#11241c] text-slate-400 uppercase text-[10px] font-bold border-y border-slate-100 dark:border-[#1a3628]">
+              <thead className="bg-[#0d221a]/90 text-emerald-300/90 uppercase text-[11px] font-extrabold tracking-wider border-y border-emerald-500/20">
                 <tr>
-                  <th className="py-2.5 px-3">Document</th>
-                  <th className="py-2.5 px-3">Vendor</th>
-                  <th className="py-2.5 px-3">Type</th>
-                  <th className="py-2.5 px-3">Category</th>
-                  <th className="py-2.5 px-3">Amount</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
+                  <th className="py-3 px-3">Document</th>
+                  <th className="py-3 px-3">Vendor</th>
+                  <th className="py-3 px-3">Type</th>
+                  <th className="py-3 px-3">Category</th>
+                  <th className="py-3 px-3">Amount</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#152e23]">
+              <tbody className="divide-y divide-white/10">
                 {data.recentDocuments.map((doc) => (
                   <tr
                     key={doc.id}
                     onClick={() => onOpenReview(doc.id)}
-                    className="hover:bg-slate-50 dark:hover:bg-[#11241c]/60 cursor-pointer transition-colors"
+                    className="hover:bg-emerald-500/10 cursor-pointer transition-colors"
                   >
-                    <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white max-w-xs truncate">
+                    <td className="py-3 px-3 font-extrabold text-white max-w-xs truncate">
                       {doc.original_filename}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
+                    <td className="py-3 px-3 font-bold text-slate-100">
                       {doc.status === 'uploaded' || doc.status === 'processing'
                         ? 'Extracting with Gemma AI…'
                         : doc.vendor_name || '—'}
                     </td>
-                    <td className="py-2.5 px-3">
-                      <span className="capitalize text-slate-500">{doc.document_type}</span>
+                    <td className="py-3 px-3">
+                      <span className="capitalize font-bold text-slate-200">{doc.document_type}</span>
                     </td>
-                    <td className="py-2.5 px-3 text-slate-500">
+                    <td className="py-3 px-3 font-bold text-emerald-300">
                       {doc.category || 'Other'}
                     </td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white">
+                    <td className="py-3 px-3 font-mono font-black text-white">
                       {doc.total_amount !== null && doc.total_amount !== undefined
                         ? `${doc.currency && doc.currency !== 'USD' ? `${doc.currency} ` : '$'}${Number(doc.total_amount).toFixed(2)}`
                         : '—'}
                     </td>
-                    <td className="py-2.5 px-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                    <td className="py-3 px-3">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
                         doc.status === 'approved'
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                           : doc.status === 'needs_review'
-                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                           : doc.status === 'uploaded' || doc.status === 'processing'
-                          ? 'bg-blue-500/15 text-blue-400 animate-pulse'
-                          : 'bg-rose-500/15 text-rose-400'
+                          ? 'bg-blue-500/20 text-blue-300 animate-pulse'
+                          : 'bg-rose-500/20 text-rose-300'
                       }`}>
                         {doc.status === 'uploaded' || doc.status === 'processing'
                           ? 'extracting…'
                           : doc.status.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td className="py-3 px-3 text-right">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onOpenReview(doc.id);
                         }}
-                        className="px-2.5 py-1 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 font-semibold cursor-pointer"
+                        className="px-3 py-1 rounded-lg text-emerald-300 hover:bg-emerald-500/20 font-extrabold cursor-pointer"
                       >
                         Review
                       </button>
@@ -458,7 +487,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             </table>
           </div>
         ) : (
-          <div className="py-8 text-center text-xs text-slate-400">
+          <div className="py-8 text-center text-xs font-bold text-slate-300">
             No recent documents found
           </div>
         )}

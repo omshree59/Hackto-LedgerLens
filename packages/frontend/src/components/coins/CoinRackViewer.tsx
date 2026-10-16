@@ -83,6 +83,7 @@ interface CoinRackViewerProps {
   onStartOllama?: () => void;
   onOpenUpload: () => void;
   reviewCount: number;
+  backgroundMode?: boolean;
 }
 
 export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
@@ -95,7 +96,8 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
   isStartingOllama = false,
   onStartOllama,
   onOpenUpload,
-  reviewCount
+  reviewCount,
+  backgroundMode = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +114,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
   // Mutable refs for 60fps animations (Zero React state churn during interaction!)
   const isPlayingRef = useRef(true);
   isPlayingRef.current = isPlaying;
+
+  const backgroundModeRef = useRef(backgroundMode);
+  backgroundModeRef.current = backgroundMode;
 
   const currentTabRef = useRef(currentTab);
   currentTabRef.current = currentTab;
@@ -218,9 +223,21 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
     setActivePreset('custom');
   }, [SPACING, START_X]);
 
-  // Keyboard navigation
+  // Sync conveyor position when currentTab changes externally (e.g. from workspace header switcher)
   useEffect(() => {
+    const idx = COIN_FEATURES.findIndex(f => f.id === currentTab);
+    if (idx >= 0) {
+      targetPosRef.current = idx;
+    }
+  }, [currentTab]);
+
+  // Keyboard navigation (active only when conveyor is in foreground and not typing in an input)
+  useEffect(() => {
+    if (backgroundMode) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
       if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
         e.preventDefault();
         targetPosRef.current = Math.min(targetPosRef.current + 1, TOTAL_COINS - 1);
@@ -251,7 +268,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [TOTAL_COINS, activatePreset, onRestoreCoins, resetCamera, triggerCoinSelection]);
+  }, [TOTAL_COINS, activatePreset, backgroundMode, onRestoreCoins, resetCamera, triggerCoinSelection]);
 
   // Front face canvas texture with full Mipmap generation to eliminate shimmering & aliasing
   const createCoinFaceTexture = useCallback((feature: CoinFeature): THREE.CanvasTexture => {
@@ -1507,6 +1524,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
         activeSpotlightRef.current.position.x += (focusX - activeSpotlightRef.current.position.x) * (1.0 - Math.exp(-14.0 * delta));
       }
 
+      // Hide the coins and conveyor rail when in workspace background mode so only the space animations show
+      coinsGroup.visible = !backgroundModeRef.current;
+
       // --- 4. Cosmic Nebula, Starfield & Falling Astronaut Animation ---
       skyboxGroup.position.copy(camera.position);
       if (isPlayingRef.current) {
@@ -1741,6 +1761,7 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
       <div className="absolute bottom-0 left-0 w-[34rem] h-[34rem] bg-blue-600/10 rounded-full blur-3xl pointer-events-none z-15" />
 
       {/* 2. Top Cinematic Header Bar */}
+      {!backgroundMode && (
       <header className="absolute top-0 left-0 right-0 z-20 px-6 py-5 flex items-center justify-between pointer-events-none">
         {/* Brand Identity */}
         <div className="flex items-center gap-4 pointer-events-auto">
@@ -1821,8 +1842,10 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
           </button>
         </div>
       </header>
+      )}
 
       {/* Floating 360° Camera Preset HUD (Top Right Sub-bar) */}
+      {!backgroundMode && (
       <div className="absolute top-20 right-6 z-20 pointer-events-none hidden sm:flex items-center gap-1.5 p-1.5 rounded-2xl bg-[#0b1714]/85 backdrop-blur-xl border border-slate-800/80 shadow-2xl">
         <div className="flex items-center gap-1.5 px-2 text-[11px] font-mono font-bold text-slate-400">
           <Camera className="size-3.5 text-emerald-400" />
@@ -1856,20 +1879,24 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
           <RotateCcw className="size-3" />
         </button>
       </div>
+      )}
 
       {/* Subtle Hint: 360° Orbit Guidance */}
+      {!backgroundMode && (
       <div className="absolute top-20 left-6 z-20 pointer-events-none hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0b1714]/75 backdrop-blur-md border border-slate-800/80 text-[11px] text-slate-400 font-mono">
         <Compass className="size-3.5 text-emerald-400 animate-spin-slow" />
         <span>Left Drag: 360° Orbit • Wheel: Zoom • Right Drag: Pan • Click: Open</span>
       </div>
+      )}
 
       {/* 3. 3D WebGL Canvas */}
       <div
         ref={containerRef}
-        className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing z-10"
+        className={`absolute inset-0 w-full h-full z-10 ${backgroundMode ? 'pointer-events-none' : 'cursor-grab active:cursor-grabbing'}`}
       />
 
       {/* 4. Bottom Focused Coin Card & Navigation HUD */}
+      {!backgroundMode && (
       <footer className="absolute bottom-6 left-6 right-6 z-20 flex flex-col md:flex-row items-center justify-between gap-4 pointer-events-none">
         {/* Left: Focused Coin Card */}
         <div className="pointer-events-auto p-4 rounded-2xl bg-[#0b1714]/90 backdrop-blur-xl border border-slate-800/80 shadow-2xl max-w-md w-full flex items-start gap-4">
@@ -1983,9 +2010,10 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
           </button>
         </div>
       </footer>
+      )}
 
       {/* 5. Interactive Help Modal */}
-      {showHelp && (
+      {!backgroundMode && showHelp && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in">
           <div className="bg-[#0b1714] border border-slate-800 p-6 rounded-2xl max-w-md w-full space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">

@@ -58,10 +58,10 @@ export const ReportsPage: React.FC = () => {
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Financial & Tax Reports
+          <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">
+            Financial &amp; Tax Reports
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-bold text-slate-300 mt-0.5">
             Comprehensive year-to-date accounting summaries compiled directly from local database records
           </p>
         </div>
@@ -94,42 +94,42 @@ export const ReportsPage: React.FC = () => {
       {/* Tax & Grand Totals Summary Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <WorkspaceCard spotlightColor="#10b981" className="space-y-2">
-          <span className="text-[11px] uppercase font-bold text-slate-400">Total Recorded Spend ({year})</span>
+          <span className="text-xs uppercase font-extrabold tracking-wider text-slate-200 block">Total Recorded Spend ({year})</span>
           <CountUp
             to={totalYearSpend}
             decimals={2}
-            prefix="$"
+            prefix=""
             separator=","
             duration={1.2}
-            className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono"
+            className="text-3xl font-black text-white font-mono"
           />
-          <p className="text-[11px] text-slate-400">Total approved expenses across all categories</p>
+          <p className="text-xs font-bold text-slate-300">Total approved expenses across all categories</p>
         </WorkspaceCard>
 
         <WorkspaceCard spotlightColor="#00D6A0" className="space-y-2">
-          <span className="text-[11px] uppercase font-bold text-slate-400">Total Sales Tax / VAT Paid</span>
+          <span className="text-xs uppercase font-extrabold tracking-wider text-slate-200 block">Total Sales Tax / VAT Paid</span>
           <CountUp
             to={data?.taxSummary?.totalTax || 0}
             decimals={2}
-            prefix="$"
+            prefix=""
             separator=","
             duration={1.2}
-            className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono"
+            className="text-3xl font-black text-emerald-400 font-mono"
           />
-          <p className="text-[11px] text-slate-400">Identified on invoices with explicit tax amounts</p>
+          <p className="text-xs font-bold text-slate-300">Identified on invoices with explicit tax amounts</p>
         </WorkspaceCard>
 
         <WorkspaceCard spotlightColor="#38bdf8" className="space-y-2">
-          <span className="text-[11px] uppercase font-bold text-slate-400">Net Subtotal Before Tax</span>
+          <span className="text-xs uppercase font-extrabold tracking-wider text-slate-200 block">Net Subtotal Before Tax</span>
           <CountUp
             to={data?.taxSummary?.totalSubtotal || 0}
             decimals={2}
-            prefix="$"
+            prefix=""
             separator=","
             duration={1.2}
-            className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono"
+            className="text-3xl font-black text-white font-mono"
           />
-          <p className="text-[11px] text-slate-400">Pre-tax business deductions basis</p>
+          <p className="text-xs font-bold text-slate-300">Pre-tax business deductions basis</p>
         </WorkspaceCard>
       </div>
 

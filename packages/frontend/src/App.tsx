@@ -209,34 +209,46 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#050A0B] text-slate-100 font-sans">
+    <div className="relative w-screen h-screen overflow-hidden bg-[#03040A] text-slate-100 font-sans">
       {/* ======================================================== */}
-      {/* STATE A: IMMERSIVE 3D COIN CONVEYOR (Full Screen, No Sidebar) */}
+      {/* PERSISTENT 3D COSMIC NEBULA, STARFIELD & COIN CONVEYOR   */}
+      {/* Stays alive as the background surroundings in Workspace! */}
       {/* ======================================================== */}
-      {appMode === 'conveyor' && (
-        <div className="absolute inset-0 w-full h-full z-10 animate-in fade-in zoom-in-95 duration-400">
-          <CoinRackViewer
-            currentTab={currentTab}
-            onSelectTab={handleSelectCoin}
-            removedCoins={removedCoins}
-            onRestoreCoins={handleRestoreCoins}
-            ollamaStatus={ollamaStatus}
-            backendOnline={backendOnline}
-            isStartingOllama={isStartingOllama}
-            onStartOllama={handleStartOllama}
-            onOpenUpload={() => setIsUploadOpen(true)}
-            reviewCount={reviewCount}
-          />
-        </div>
-      )}
+      <div
+        className={`absolute inset-0 w-full h-full transition-opacity duration-500 ${
+          appMode === 'conveyor' ? 'z-10 opacity-100' : 'z-0 opacity-100 pointer-events-none'
+        }`}
+      >
+        <CoinRackViewer
+          currentTab={currentTab}
+          onSelectTab={handleSelectCoin}
+          removedCoins={removedCoins}
+          onRestoreCoins={handleRestoreCoins}
+          ollamaStatus={ollamaStatus}
+          backendOnline={backendOnline}
+          isStartingOllama={isStartingOllama}
+          onStartOllama={handleStartOllama}
+          onOpenUpload={() => setIsUploadOpen(true)}
+          reviewCount={reviewCount}
+          backgroundMode={appMode === 'workspace'}
+        />
+      </div>
 
       {/* ======================================================== */}
-      {/* STATE B: SELECTED WORKSPACE (Full Screen, Sidebar-Free)  */}
+      {/* STATE B: SELECTED WORKSPACE OVER COSMIC SURROUNDINGS     */}
       {/* ======================================================== */}
       {appMode === 'workspace' && (
-        <div className="absolute inset-0 w-full h-full flex flex-col z-10 bg-[#050A0B] animate-in fade-in slide-in-from-bottom-3 duration-300">
+        <div className="absolute inset-0 w-full h-full flex flex-col z-10 bg-[#03050c]/20 animate-in fade-in slide-in-from-bottom-3 duration-300">
+          {/* Ambient Cosmic Nebula Glows matching the 3D skybox */}
+          <div
+            className="pointer-events-none absolute -top-24 left-1/4 w-[38rem] h-[38rem] rounded-full blur-3xl opacity-20"
+            style={{ backgroundColor: activeCoinMeta.color }}
+          />
+          <div className="pointer-events-none absolute top-10 right-8 w-[32rem] h-[32rem] bg-fuchsia-600/15 rounded-full blur-3xl" />
+          <div className="pointer-events-none absolute bottom-0 left-8 w-[32rem] h-[32rem] bg-blue-600/15 rounded-full blur-3xl" />
+
           {/* Top Floating Glass HUD */}
-          <header className="h-16 px-6 border-b border-slate-800/80 bg-[#071310]/90 backdrop-blur-xl flex items-center justify-between shrink-0 z-20">
+          <header className="h-16 px-6 border-b border-white/10 bg-[#06110e]/75 backdrop-blur-xl flex items-center justify-between shrink-0 z-20">
             {/* Left: Return to Conveyor CTA & Active Coin Pill */}
             <div className="flex items-center gap-3">
               <button
@@ -359,8 +371,8 @@ export const App: React.FC = () => {
             </div>
           </header>
 
-          {/* Main Full-Screen Workspace Body */}
-          <main className="flex-1 overflow-y-auto bg-[#050A0B] text-slate-100">
+          {/* Main Full-Screen Workspace Body over the live 3D cosmic background */}
+          <main className="relative z-10 flex-1 overflow-y-auto bg-transparent text-slate-100">
             <div key={`${currentTab}-${workspaceRefreshKey}`} className="animate-in fade-in duration-200">
               {renderWorkspaceContent()}
             </div>

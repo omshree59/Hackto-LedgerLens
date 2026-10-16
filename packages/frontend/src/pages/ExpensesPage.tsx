@@ -149,10 +149,10 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">
             Expense Tracker
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-bold text-slate-300 mt-0.5">
             Recorded business expenses linked to verified source documents
           </p>
         </div>
@@ -161,15 +161,15 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
           <a
             href={api.exportCsvUrl('expenses', { category, startDate, endDate })}
             download
-            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#152e23] text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-[#091813]/80 text-slate-100 hover:bg-[#152e23] text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"
           >
-            <Download className="size-3.5" />
+            <Download className="size-3.5 text-emerald-400" />
             <span>Export CSV</span>
           </a>
 
           <button
             onClick={handleOpenCreate}
-            className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-md shadow-emerald-950/50 cursor-pointer flex items-center gap-1.5"
           >
             <Plus className="size-3.5" />
             <span>Add Expense</span>
@@ -180,23 +180,23 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
       {/* Summary Stat Card */}
       <WorkspaceCard spotlightColor="#059669" className="!p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-500 flex items-center justify-center">
+          <div className="size-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center">
             <Wallet className="size-5" />
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 font-semibold uppercase">Total Filtered Spend</span>
+            <span className="text-xs text-slate-200 font-extrabold uppercase tracking-wider block">Total Filtered Spend</span>
             <CountUp
               to={totalSum}
               decimals={2}
-              prefix="$"
+              prefix={expenses[0]?.currency && expenses[0].currency !== 'USD' ? `${expenses[0].currency} ` : '$'}
               separator=","
               duration={1.15}
-              className="text-xl font-extrabold text-slate-900 dark:text-white font-mono"
+              className="text-2xl font-black text-white font-mono"
             />
           </div>
         </div>
-        <div className="text-xs text-slate-500">
-          Showing <span className="font-bold text-slate-800 dark:text-slate-200">{total}</span> recorded transactions
+        <div className="text-xs font-bold text-slate-200">
+          Showing <span className="font-black text-emerald-300">{total}</span> recorded transactions
         </div>
       </WorkspaceCard>
 
@@ -251,7 +251,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
       <WorkspaceCard spotlightColor="#059669" className="!p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-[#11241c] text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200 dark:border-[#193627]">
+            <thead className="bg-[#0d221a]/90 text-emerald-300/90 uppercase text-[11px] font-extrabold tracking-wider border-b border-emerald-500/20">
               <tr>
                 <th className="py-3 px-3">Date</th>
                 <th className="py-3 px-3">Vendor</th>
@@ -262,27 +262,27 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
                 <th className="py-3 px-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#152e23]">
+            <tbody className="divide-y divide-white/10">
               {expenses.length > 0 ? (
                 expenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-50 dark:hover:bg-[#11241c]/60 transition-colors">
-                    <td className="py-3 px-3 font-mono text-slate-500 dark:text-slate-400">
+                  <tr key={exp.id} className="hover:bg-emerald-500/10 transition-colors">
+                    <td className="py-3 px-3 font-mono font-bold text-slate-200">
                       {exp.expense_date}
                     </td>
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-white">
+                    <td className="py-3 px-3 font-extrabold text-white">
                       {exp.vendor_name}
                     </td>
-                    <td className="py-3 px-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">
+                    <td className="py-3 px-3 font-semibold text-slate-200 max-w-xs truncate">
                       {exp.description || '—'}
                     </td>
                     <td className="py-3 px-3">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-[#152e23] text-slate-700 dark:text-slate-300">
-                        <Tag className="size-2.5 text-emerald-500" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-[#152e23] text-emerald-300 border border-emerald-500/25">
+                        <Tag className="size-2.5 text-emerald-400" />
                         <span>{exp.category}</span>
                       </span>
                     </td>
-                    <td className="py-3 px-3 font-mono font-bold text-slate-900 dark:text-white">
-                      ${exp.amount.toFixed(2)}
+                    <td className="py-3 px-3 font-mono font-black text-white">
+                      {exp.currency && exp.currency !== 'USD' ? `${exp.currency} ` : '$'}{exp.amount.toFixed(2)}
                     </td>
                     <td className="py-3 px-3">
                       {exp.document_id ? (

@@ -162,13 +162,13 @@ export const RulesPage: React.FC = () => {
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+          <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2 drop-shadow-sm">
             <span>Automation Rules</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
               Gemma Assisted
             </span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-bold text-slate-300 mt-0.5">
             Define deterministic condition-action workflows to automatically categorize, tag, and route invoices
           </p>
         </div>
@@ -302,33 +302,33 @@ export const RulesPage: React.FC = () => {
           ))}
 
           {rules.length === 0 && !isLoading && (
-            <div className="py-12 text-center text-xs text-slate-400">
-              No automation rules created yet. Click "+ Create Rule" to build your first workflow.
-            </div>
+            <WorkspaceCard spotlightColor="#7B35FF" className="py-12 text-center text-xs font-bold text-slate-200">
+              No automation rules created yet. Click &quot;+ Create Rule&quot; to build your first workflow.
+            </WorkspaceCard>
           )}
         </div>
       ) : (
         /* History Log */
-        <div className="rounded-2xl bg-white dark:bg-[#0c1813] border border-slate-200 dark:border-[#193627] shadow-xs overflow-hidden text-xs">
+        <WorkspaceCard spotlightColor="#7B35FF" className="!p-0 overflow-hidden text-xs">
           <table className="w-full text-left">
-            <thead className="bg-slate-50 dark:bg-[#11241c] text-slate-400 uppercase text-[10px] font-bold border-b border-slate-200 dark:border-[#193627]">
+            <thead className="bg-[#0d221a]/90 text-emerald-300/90 uppercase text-[11px] font-extrabold tracking-wider border-b border-emerald-500/20">
               <tr>
-                <th className="py-2.5 px-3">Executed At</th>
-                <th className="py-2.5 px-3">Rule Name</th>
-                <th className="py-2.5 px-3">Triggered By Document</th>
-                <th className="py-2.5 px-3">Actions Applied</th>
+                <th className="py-3 px-3">Executed At</th>
+                <th className="py-3 px-3">Rule Name</th>
+                <th className="py-3 px-3">Triggered By Document</th>
+                <th className="py-3 px-3">Actions Applied</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#152e23]">
+            <tbody className="divide-y divide-white/10">
               {history.map((h) => (
-                <tr key={h.id} className="hover:bg-slate-50 dark:hover:bg-[#11241c]/50">
-                  <td className="py-2.5 px-3 font-mono text-slate-400">{h.executed_at}</td>
-                  <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">{h.rule_name}</td>
-                  <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 truncate max-w-xs">{h.original_filename}</td>
-                  <td className="py-2.5 px-3">
+                <tr key={h.id} className="hover:bg-emerald-500/10">
+                  <td className="py-3 px-3 font-mono font-bold text-slate-200">{h.executed_at}</td>
+                  <td className="py-3 px-3 font-extrabold text-white">{h.rule_name}</td>
+                  <td className="py-3 px-3 font-bold text-slate-100 truncate max-w-xs">{h.original_filename}</td>
+                  <td className="py-3 px-3">
                     <div className="flex flex-wrap gap-1">
                       {h.actions_applied?.map((act: any, idx: number) => (
-                        <span key={idx} className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-mono text-[10px]">
+                        <span key={idx} className="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-mono font-bold text-[10px]">
                           {act.type}: {act.value}
                         </span>
                       ))}
@@ -338,12 +338,12 @@ export const RulesPage: React.FC = () => {
               ))}
               {history.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="py-10 text-center text-slate-400">No rule execution logs recorded yet.</td>
+                  <td colSpan={4} className="py-10 text-center font-bold text-slate-300">No rule execution logs recorded yet.</td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
+        </WorkspaceCard>
       )}
 
       {/* Visual Rule Builder Modal with Gemma Assistant */}
