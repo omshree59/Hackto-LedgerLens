@@ -31,6 +31,7 @@ import { api } from '../api/client';
 import type { DashboardData, DocumentType } from '../types';
 import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
 import CountUp from '../components/reactbits/CountUp';
+import { readHistory, writeHistory } from '../storage/ledgerCache';
 
 interface OverviewPageProps {
   onOpenReview: (id: string) => void;
@@ -50,8 +51,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   onNavigateTab,
   searchQuery
 }) => {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedDashboard = readHistory<DashboardData | null>('dashboard', null);
+  const [data, setData] = useState<DashboardData | null>(cachedDashboard);
+  const [isLoading, setIsLoading] = useState(!cachedDashboard);
   const [dateRange, setDateRange] = useState<'30d' | '90d' | 'all'>('all');
 
   useEffect(() => {
@@ -85,8 +87,11 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
     try {
       const res = await api.getDashboardData(startDate);
       setData(res);
+      writeHistory('dashboard', res);
     } catch (err) {
       console.error('Failed to load dashboard:', err);
+      const fallback = readHistory<DashboardData | null>('dashboard', null);
+      if (fallback) setData(fallback);
     } finally {
       setIsLoading(false);
     }

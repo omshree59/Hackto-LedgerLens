@@ -16,12 +16,16 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
+import { readHistory, writeHistory } from '../storage/ledgerCache';
 import type { AutomationRule } from '../types';
 
+type RulesCache = { rules: AutomationRule[]; history: any[] };
+
 export const RulesPage: React.FC = () => {
-  const [rules, setRules] = useState<AutomationRule[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedRules = readHistory<RulesCache>('rules', { rules: [], history: [] });
+  const [rules, setRules] = useState<AutomationRule[]>(cachedRules.rules);
+  const [history, setHistory] = useState<any[]>(cachedRules.history);
+  const [isLoading, setIsLoading] = useState(cachedRules.rules.length === 0);
   const [activeTab, setActiveTab] = useState<'rules' | 'history'>('rules');
 
   // Rule creation modal
@@ -54,8 +58,14 @@ export const RulesPage: React.FC = () => {
       ]);
       setRules(rulesList);
       setHistory(historyList);
+      writeHistory('rules', { rules: rulesList, history: historyList });
     } catch (err) {
       console.error('Failed to load rules:', err);
+      const fallback = readHistory<RulesCache>('rules', { rules: [], history: [] });
+      if (fallback.rules.length > 0) {
+        setRules(fallback.rules);
+        setHistory(fallback.history);
+      }
     } finally {
       setIsLoading(false);
     }

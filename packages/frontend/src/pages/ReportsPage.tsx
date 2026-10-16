@@ -23,11 +23,13 @@ import {
 import { api } from '../api/client';
 import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
 import CountUp from '../components/reactbits/CountUp';
+import { readHistory, writeHistory } from '../storage/ledgerCache';
 
 export const ReportsPage: React.FC = () => {
   const [year, setYear] = useState('2026');
-  const [data, setData] = useState<any | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedReports = readHistory<any | null>('reports', null);
+  const [data, setData] = useState<any | null>(cachedReports);
+  const [isLoading, setIsLoading] = useState(!cachedReports);
 
   useEffect(() => {
     loadReports();
@@ -38,8 +40,11 @@ export const ReportsPage: React.FC = () => {
     try {
       const res = await api.getReportsData(year);
       setData(res);
+      writeHistory('reports', res);
     } catch (err) {
       console.error('Failed to load reports:', err);
+      const fallback = readHistory<any | null>('reports', null);
+      if (fallback) setData(fallback);
     } finally {
       setIsLoading(false);
     }

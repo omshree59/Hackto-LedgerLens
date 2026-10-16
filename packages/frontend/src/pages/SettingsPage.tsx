@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
+import { clearHistory } from '../storage/ledgerCache';
 import type { OllamaStatus } from '../types';
 
 export const SettingsPage: React.FC = () => {
@@ -96,6 +97,7 @@ export const SettingsPage: React.FC = () => {
 
     try {
       await api.resetAllData();
+      clearHistory();
       setActionFeedback({ type: 'success', text: 'All application records and local files have been reset.' });
       loadSettings();
     } catch (err: any) {
@@ -259,6 +261,9 @@ export const SettingsPage: React.FC = () => {
             <span className="text-slate-400 text-[10px] uppercase font-bold block">Local Data Path</span>
             <span className="text-[11px] font-mono text-slate-700 dark:text-slate-300 break-all block mt-1">
               {storage?.dataDir}
+            </span>
+            <span className="text-[10px] text-slate-400 block mt-1">
+              Kept on this PC after terminals close
             </span>
           </div>
         </div>

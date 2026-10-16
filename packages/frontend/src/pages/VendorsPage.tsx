@@ -16,6 +16,7 @@ import {
 import { api } from '../api/client';
 import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
 import CountUp from '../components/reactbits/CountUp';
+import { readHistory, writeHistory } from '../storage/ledgerCache';
 import type { VendorItem } from '../types';
 
 interface VendorsPageProps {
@@ -24,8 +25,9 @@ interface VendorsPageProps {
 }
 
 export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSearch }) => {
-  const [vendors, setVendors] = useState<VendorItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedVendors = readHistory<VendorItem[]>('vendors', []);
+  const [vendors, setVendors] = useState<VendorItem[]>(cachedVendors);
+  const [isLoading, setIsLoading] = useState(cachedVendors.length === 0);
   const [search, setSearch] = useState(globalSearch);
 
   // Selected vendor detail modal
@@ -48,8 +50,11 @@ export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSe
     try {
       const data = await api.getVendors(search);
       setVendors(data);
+      writeHistory('vendors', data);
     } catch (err) {
       console.error('Failed to load vendors:', err);
+      const fallback = readHistory<VendorItem[]>('vendors', []);
+      if (fallback.length > 0) setVendors(fallback);
     } finally {
       setIsLoading(false);
     }

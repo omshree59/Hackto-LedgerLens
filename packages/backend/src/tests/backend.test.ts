@@ -133,7 +133,7 @@ describe('Zod Schema Validation', () => {
 
 import request from 'supertest';
 import { app } from '../index.js';
-import { getDb } from '../db/index.js';
+import { getDb, closeDb } from '../db/index.js';
 
 describe('API Integration Endpoints - Internal Features Verification', () => {
   afterAll(() => {
@@ -142,6 +142,7 @@ describe('API Integration Endpoints - Internal Features Verification', () => {
     db.prepare('DELETE FROM vendors').run();
     db.prepare('DELETE FROM automation_rules').run();
     db.prepare('DELETE FROM documents').run();
+    closeDb();
   });
   it('GET / should return 200 with online status', async () => {
     const res = await request(app).get('/');

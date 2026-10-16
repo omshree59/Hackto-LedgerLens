@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import { CONFIG, UPLOADS_DIR } from './config.js';
-import { getDb } from './db/index.js';
+import { CONFIG, UPLOADS_DIR, DATA_DIR, DB_FILE } from './config.js';
+import { getDb, closeDb } from './db/index.js';
 import { OllamaService } from './services/ollama.service.js';
 
 import healthRouter from './routes/health.router.js';
@@ -79,6 +79,8 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`===================================================`);
     console.log(`  LedgerLens Backend running at http://${CONFIG.HOST}:${CONFIG.PORT}`);
     console.log(`  Local AI target: ${CONFIG.OLLAMA_BASE_URL} (${CONFIG.DEFAULT_MODEL})`);
+    console.log(`  Persistent ledger: ${DB_FILE}`);
+    console.log(`  Uploads & history: ${DATA_DIR}`);
     console.log(`===================================================`);
 
     // Dev convenience: bring the local Ollama daemon up if it is installed but not running.
@@ -98,13 +100,22 @@ if (process.env.NODE_ENV !== 'test') {
     }
   });
 
-  // Graceful shutdown
-  process.on('SIGINT', () => {
+  const shutdown = (signal: string) => {
+    console.log(`  ${signal} received — saving ledger history...`);
+    closeDb();
     if (server) {
       server.close(() => {
         console.log('Server stopped');
         process.exit(0);
       });
+      setTimeout(() => process.exit(0), 1500).unref();
+    } else {
+      process.exit(0);
     }
-  });
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGHUP', () => shutdown('SIGHUP'));
+  process.on('SIGBREAK', () => shutdown('SIGBREAK'));
 }

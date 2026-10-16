@@ -45,6 +45,7 @@ router.get('/', async (req, res) => {
     settings,
     storage: {
       dataDir: DATA_DIR,
+      dbFile: DB_FILE,
       uploadFilesCount,
       uploadSizeMb: (uploadBytes / (1024 * 1024)).toFixed(2),
       dbSizeMb: (dbBytes / (1024 * 1024)).toFixed(2),

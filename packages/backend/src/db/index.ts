@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
-import { DB_FILE } from '../config.js';
+import fs from 'fs';
+import path from 'path';
+import { DB_FILE, UPLOADS_DIR } from '../config.js';
 import crypto from 'crypto';
 
 let dbInstance: Database.Database | null = null;
@@ -13,9 +15,47 @@ export function getDb(): Database.Database {
     dbInstance.pragma('temp_store = MEMORY');
     dbInstance.pragma('cache_size = -16000');
     dbInstance.pragma('foreign_keys = ON');
+    try {
+      dbInstance.pragma('wal_checkpoint(TRUNCATE)');
+    } catch {
+      // Recovery still happens on open; checkpoint is best-effort.
+    }
     initSchema(dbInstance);
+    remapStoredFilePaths(dbInstance);
   }
   return dbInstance;
+}
+
+function remapStoredFilePaths(db: Database.Database): void {
+  const rows = db.prepare('SELECT id, filename, storage_path FROM documents').all() as Array<{
+    id: string;
+    filename: string;
+    storage_path: string;
+  }>;
+  const update = db.prepare('UPDATE documents SET storage_path = ? WHERE id = ?');
+  for (const row of rows) {
+    if (row.storage_path && fs.existsSync(row.storage_path)) continue;
+    const candidate = path.join(UPLOADS_DIR, row.filename);
+    if (fs.existsSync(candidate)) {
+      update.run(candidate, row.id);
+    }
+  }
+}
+
+/** Flush WAL into the main file and close so history survives terminal/process exit. */
+export function closeDb(): void {
+  if (!dbInstance) return;
+  try {
+    dbInstance.pragma('wal_checkpoint(TRUNCATE)');
+  } catch {
+    // Still close even if checkpoint is busy.
+  }
+  try {
+    dbInstance.close();
+  } catch {
+    // Process is exiting; ignore close races.
+  }
+  dbInstance = null;
 }
 
 export function initSchema(db: Database.Database): void {

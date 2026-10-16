@@ -15,7 +15,10 @@ import {
 } from 'lucide-react';
 import { api } from '../../api/client';
 import { WorkspaceCard } from '../reactbits/WorkspaceCard';
+import { readHistory, writeHistory } from '../../storage/ledgerCache';
 import type { DocumentItem, DocumentType, DocumentStatus } from '../../types';
+
+type DocsCache = { items: DocumentItem[]; total: number; totalPages: number };
 
 interface DocumentTableProps {
   documentType?: DocumentType;
@@ -40,11 +43,13 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   description,
   spotlightColor = '#00D6A0'
 }) => {
-  const [items, setItems] = useState<DocumentItem[]>([]);
-  const [total, setTotal] = useState(0);
+  const docsCacheKey = `docs:${documentType || 'all'}:${filterStatus || 'any'}`;
+  const cachedDocs = readHistory<DocsCache>(docsCacheKey, { items: [], total: 0, totalPages: 1 });
+  const [items, setItems] = useState<DocumentItem[]>(cachedDocs.items);
+  const [total, setTotal] = useState(cachedDocs.total);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(cachedDocs.totalPages);
+  const [isLoading, setIsLoading] = useState(cachedDocs.items.length === 0);
 
   // Filters
   const [search, setSearch] = useState(globalSearch);
@@ -106,8 +111,15 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
       setItems(res.items);
       setTotal(res.total);
       setTotalPages(res.totalPages);
+      writeHistory(docsCacheKey, { items: res.items, total: res.total, totalPages: res.totalPages });
     } catch (err) {
       console.error('Failed to load documents:', err);
+      const fallback = readHistory<DocsCache>(docsCacheKey, { items: [], total: 0, totalPages: 1 });
+      if (fallback.items.length > 0) {
+        setItems(fallback.items);
+        setTotal(fallback.total);
+        setTotalPages(fallback.totalPages);
+      }
     } finally {
       setIsLoading(false);
     }

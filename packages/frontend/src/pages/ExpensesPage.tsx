@@ -16,7 +16,10 @@ import {
 import { api } from '../api/client';
 import { WorkspaceCard } from '../components/reactbits/WorkspaceCard';
 import CountUp from '../components/reactbits/CountUp';
+import { readHistory, writeHistory } from '../storage/ledgerCache';
 import type { ExpenseItem } from '../types';
+
+type ExpensesCache = { items: ExpenseItem[]; total: number; totalSum: number; totalPages: number };
 
 interface ExpensesPageProps {
   onOpenReview: (id: string) => void;
@@ -24,12 +27,15 @@ interface ExpensesPageProps {
 }
 
 export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, globalSearch }) => {
-  const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalSum, setTotalSum] = useState(0);
+  const cachedExpenses = readHistory<ExpensesCache>('expenses', {
+    items: [], total: 0, totalSum: 0, totalPages: 1
+  });
+  const [expenses, setExpenses] = useState<ExpenseItem[]>(cachedExpenses.items);
+  const [total, setTotal] = useState(cachedExpenses.total);
+  const [totalSum, setTotalSum] = useState(cachedExpenses.totalSum);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [isLoading, setIsLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(cachedExpenses.totalPages);
+  const [isLoading, setIsLoading] = useState(cachedExpenses.items.length === 0);
 
   // Filters
   const [search, setSearch] = useState(globalSearch);
@@ -70,8 +76,23 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
       setTotal(res.total);
       setTotalSum(res.totalSum);
       setTotalPages(res.totalPages);
+      writeHistory('expenses', {
+        items: res.items,
+        total: res.total,
+        totalSum: res.totalSum,
+        totalPages: res.totalPages
+      });
     } catch (err) {
       console.error('Failed to load expenses:', err);
+      const fallback = readHistory<ExpensesCache>('expenses', {
+        items: [], total: 0, totalSum: 0, totalPages: 1
+      });
+      if (fallback.items.length > 0) {
+        setExpenses(fallback.items);
+        setTotal(fallback.total);
+        setTotalSum(fallback.totalSum);
+        setTotalPages(fallback.totalPages);
+      }
     } finally {
       setIsLoading(false);
     }

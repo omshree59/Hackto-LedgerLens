@@ -17,6 +17,7 @@ import { LocalAiPage } from './pages/LocalAiPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 import { api } from './api/client';
+import { readSession, writeSession } from './storage/ledgerCache';
 import {
   ArrowLeft,
   UploadCloud,
@@ -29,14 +30,27 @@ import {
   RotateCcw
 } from 'lucide-react';
 
+const TABS: NavItem[] = [
+  'overview', 'invoices', 'receipts', 'review', 'vendors',
+  'expenses', 'rules', 'reports', 'local_ai', 'settings'
+];
+
 export const App: React.FC = () => {
+  const savedSession = readSession();
+
   // Application Mode: 'conveyor' (State A) or 'workspace' (State B)
-  const [appMode, setAppMode] = useState<'conveyor' | 'workspace'>('conveyor');
-  const [currentTab, setCurrentTab] = useState<NavItem>('overview');
+  const [appMode, setAppMode] = useState<'conveyor' | 'workspace'>(
+    savedSession?.appMode === 'workspace' ? 'workspace' : 'conveyor'
+  );
+  const [currentTab, setCurrentTab] = useState<NavItem>(
+    TABS.includes(savedSession?.currentTab as NavItem) ? (savedSession!.currentTab as NavItem) : 'overview'
+  );
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Removed coins persistence during session (empty slot on conveyor)
-  const [removedCoins, setRemovedCoins] = useState<string[]>([]);
+  // Remember emptied conveyor slots across terminal/browser restarts
+  const [removedCoins, setRemovedCoins] = useState<string[]>(
+    Array.isArray(savedSession?.removedCoins) ? savedSession!.removedCoins : []
+  );
 
   // Theme
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -64,6 +78,10 @@ export const App: React.FC = () => {
       localStorage.setItem('ledgerlens_theme', 'light');
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    writeSession({ appMode, currentTab, removedCoins });
+  }, [appMode, currentTab, removedCoins]);
 
   // Poll fast (2s) while anything is down so a late-started backend/Ollama is picked up
   // immediately, then relax to 8s once everything is healthy.
