@@ -69,6 +69,19 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
     i => i.status === 'uploaded' || i.status === 'processing'
   );
 
+  // Compute summary stats for the currently loaded documents
+  const pageCurrency = items.find(i => i.currency && i.currency !== 'USD')?.currency || 'USD';
+  const currencyPrefix = pageCurrency === 'USD' ? '$' : `${pageCurrency} `;
+  const totalPageValue = items.reduce((sum, d) => sum + (d.total_amount || 0), 0);
+  const approvedCount = items.filter(d => d.status === 'approved').length;
+  const reviewCount = items.filter(d => d.status === 'needs_review').length;
+  const avgConfidence = items.length > 0
+    ? Math.round(
+        (items.reduce((acc, d) => acc + (d.ocr_confidence ?? 0.92), 0) / items.length) * 100
+      )
+    : 0;
+  const featuredDoc = items[0] || null;
+
   useEffect(() => {
     if (!hasProcessingItems) return;
     const timer = setInterval(() => {
@@ -158,9 +171,9 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
   };
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="p-6 lg:px-10 gap-4 w-full h-full min-h-0 flex-1 flex flex-col overflow-hidden">
       {/* Title & Top Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">
             {title}
@@ -190,28 +203,77 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
         </div>
       </div>
 
+      {/* 4-Card Summary Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
+        <WorkspaceCard spotlightColor={spotlightColor} className="!p-4 space-y-1.5">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-200 block">
+            Total Records
+          </span>
+          <div className="text-2xl font-black text-white font-mono">{total}</div>
+          <p className="text-[11px] font-bold text-slate-300">
+            Stored in local SQLite ledger
+          </p>
+        </WorkspaceCard>
+
+        <WorkspaceCard spotlightColor="#10b981" className="!p-4 space-y-1.5">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-200 block">
+            Total Extracted Value
+          </span>
+          <div className="text-2xl font-black text-emerald-300 font-mono">
+            {currencyPrefix}{totalPageValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <p className="text-[11px] font-bold text-slate-300">
+            Sum across displayed documents
+          </p>
+        </WorkspaceCard>
+
+        <WorkspaceCard spotlightColor="#38bdf8" className="!p-4 space-y-1.5">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-200 block">
+            Approved &amp; Verified
+          </span>
+          <div className="text-2xl font-black text-white font-mono">
+            {approvedCount} <span className="text-xs font-bold text-amber-300 ml-1">({reviewCount} in review)</span>
+          </div>
+          <p className="text-[11px] font-bold text-slate-300">
+            Synced with expense tracker
+          </p>
+        </WorkspaceCard>
+
+        <WorkspaceCard spotlightColor="#a855f7" className="!p-4 space-y-1.5">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-200 block">
+            Avg OCR Confidence
+          </span>
+          <div className="text-2xl font-black text-white font-mono">
+            {avgConfidence > 0 ? `${avgConfidence}%` : '—'}
+          </div>
+          <p className="text-[11px] font-bold text-slate-300">
+            On-device OCR + Gemma 3:4b
+          </p>
+        </WorkspaceCard>
+      </div>
+
       {/* Filter & Search Bar */}
-      <WorkspaceCard spotlightColor={spotlightColor} className="!p-3 flex flex-wrap items-center justify-between gap-3">
+      <WorkspaceCard spotlightColor={spotlightColor} className="!p-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
         {/* Search */}
-        <div className="flex-1 min-w-[200px] relative">
-          <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="flex-1 min-w-[280px] relative">
+          <Search className="size-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search vendor, invoice #, filename..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full pl-12 pr-4 py-3 text-sm rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
 
         {/* Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap text-xs">
+        <div className="flex items-center gap-2 flex-wrap text-sm">
           {/* Status Filter */}
           {!filterStatus && (
             <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300 focus:outline-none"
+              className="px-3 py-3 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300 focus:outline-none"
             >
               <option value="">All Statuses</option>
               <option value="needs_review">Needs Review</option>
@@ -225,7 +287,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
           <select
             value={categoryFilter}
             onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300 focus:outline-none"
+            className="px-3 py-3 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300 focus:outline-none"
           >
             <option value="">All Categories</option>
             <option value="Software">Software</option>
@@ -241,10 +303,10 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
 
           <button
             onClick={() => loadDocuments(false)}
-            className="p-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+            className="p-3 rounded-xl border border-slate-200 dark:border-[#1e3c2c] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
             title="Refresh"
           >
-            <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </WorkspaceCard>
@@ -288,9 +350,12 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
         </div>
       )}
 
-      {/* Documents Table */}
-      <WorkspaceCard spotlightColor={spotlightColor} className="!p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Documents Table — stretches to the bottom of the workspace */}
+      <WorkspaceCard
+        spotlightColor={spotlightColor}
+        className="!p-0 overflow-hidden flex-1 min-h-0 flex flex-col"
+      >
+        <div className="flex-1 min-h-0 overflow-auto flex flex-col">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#0d221a]/90 text-emerald-300/90 uppercase text-[11px] font-extrabold tracking-wider border-b border-emerald-500/20">
               <tr>
@@ -413,10 +478,103 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
               )}
             </tbody>
           </table>
+
+          {/* Lower Space Filler: Featured Document Breakdown & Quick Upload Dropzone when fewer than 6 rows */}
+          {items.length < 6 && (
+            <div className="p-5 flex-1 min-h-[12rem] grid grid-cols-1 lg:grid-cols-12 gap-5 border-t border-white/10 bg-[#06120e]/45">
+              {/* Left 7 cols: Latest Document Quick Inspector */}
+              <div className="lg:col-span-7 p-5 rounded-2xl bg-[#091a14]/85 border border-emerald-500/25 flex flex-col justify-between space-y-4">
+                {featuredDoc ? (
+                  <>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 block">
+                          Latest Extracted Document Spotlight
+                        </span>
+                        <h3 className="text-base font-black text-white mt-0.5">
+                          {featuredDoc.vendor_name || featuredDoc.original_filename}
+                        </h3>
+                        <p className="text-xs font-bold text-slate-300 mt-0.5">
+                          File: <span className="font-mono text-slate-100">{featuredDoc.original_filename}</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onOpenReview(featuredDoc.id)}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold cursor-pointer shadow-sm shrink-0"
+                      >
+                        Open Full Workspace →
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-white/10 text-xs">
+                      <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                        <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Invoice / Ref #</span>
+                        <span className="font-mono font-extrabold text-white mt-0.5 block truncate">
+                          {featuredDoc.invoice_number || '—'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                        <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Issue Date</span>
+                        <span className="font-mono font-extrabold text-white mt-0.5 block">
+                          {featuredDoc.invoice_date || featuredDoc.created_at.slice(0, 10)}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                        <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Subtotal / Tax</span>
+                        <span className="font-mono font-extrabold text-slate-200 mt-0.5 block">
+                          {featuredDoc.subtotal !== null && featuredDoc.subtotal !== undefined
+                            ? `${currencyPrefix}${Number(featuredDoc.subtotal).toFixed(2)}`
+                            : '—'}{' '}
+                          /{' '}
+                          {featuredDoc.tax_amount !== null && featuredDoc.tax_amount !== undefined
+                            ? `${currencyPrefix}${Number(featuredDoc.tax_amount).toFixed(2)}`
+                            : '0.00'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
+                        <span className="text-[10px] font-extrabold uppercase text-emerald-300 block">Grand Total</span>
+                        <span className="font-mono font-black text-sm text-emerald-300 mt-0.5 block">
+                          {featuredDoc.total_amount !== null && featuredDoc.total_amount !== undefined
+                            ? `${currencyPrefix}${Number(featuredDoc.total_amount).toFixed(2)}`
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-6 text-center space-y-2">
+                    <h3 className="text-sm font-extrabold text-white">No Documents Stored Yet</h3>
+                    <p className="text-xs font-bold text-slate-300">
+                      Upload an invoice or receipt on the right to extract vendor, line items, taxes, and totals with local Gemma AI.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Right 5 cols: Quick Import Dropzone Card */}
+              <div
+                onClick={onOpenUpload}
+                className="lg:col-span-5 p-5 rounded-2xl border-2 border-dashed border-emerald-500/35 hover:border-emerald-400 bg-[#071611]/70 hover:bg-[#0b221a]/80 transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-2.5"
+              >
+                <div className="size-11 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 flex items-center justify-center">
+                  <FileText className="size-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">
+                    + Import More {documentType === 'receipt' ? 'Receipts' : 'Invoices'}
+                  </h4>
+                  <p className="text-xs font-bold text-slate-300 mt-0.5">
+                    Click to upload PDF, PNG, JPG, or WEBP for instant local OCR &amp; Gemma extraction
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pagination Footer */}
-        <div className="p-3.5 px-4 bg-slate-50 dark:bg-[#091510] border-t border-slate-200 dark:border-[#193627] flex items-center justify-between text-xs text-slate-500">
+        <div className="p-4 px-5 bg-[#07130f]/90 border-t border-emerald-500/20 flex items-center justify-between text-xs font-bold text-slate-300 shrink-0">
           <span>
             Showing {items.length} of {total} document(s)
           </span>

@@ -158,7 +158,7 @@ export const RulesPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="p-6 lg:px-10 gap-5 w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto">
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -210,7 +210,7 @@ export const RulesPage: React.FC = () => {
 
       {activeTab === 'rules' ? (
         /* Rules List */
-        <div className="space-y-3">
+        <div className="space-y-3 flex-1 flex flex-col">
           {rules.map((rule) => (
             <WorkspaceCard
               key={rule.id}
@@ -302,14 +302,14 @@ export const RulesPage: React.FC = () => {
           ))}
 
           {rules.length === 0 && !isLoading && (
-            <WorkspaceCard spotlightColor="#7B35FF" className="py-12 text-center text-xs font-bold text-slate-200">
+            <WorkspaceCard spotlightColor="#7B35FF" className="py-12 flex-1 flex items-center justify-center text-center text-xs font-bold text-slate-200">
               No automation rules created yet. Click &quot;+ Create Rule&quot; to build your first workflow.
             </WorkspaceCard>
           )}
         </div>
       ) : (
         /* History Log */
-        <WorkspaceCard spotlightColor="#7B35FF" className="!p-0 overflow-hidden text-xs">
+        <WorkspaceCard spotlightColor="#7B35FF" className="!p-0 overflow-hidden text-xs flex-1 flex flex-col">
           <table className="w-full text-left">
             <thead className="bg-[#0d221a]/90 text-emerald-300/90 uppercase text-[11px] font-extrabold tracking-wider border-b border-emerald-500/20">
               <tr>

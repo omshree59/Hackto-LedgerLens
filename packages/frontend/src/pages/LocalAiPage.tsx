@@ -94,7 +94,7 @@ export const LocalAiPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 lg:px-10 w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto gap-8 animate-in fade-in duration-300">
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-[#071b19] via-[#0b1714] to-[#071b19] border border-emerald-500/20 shadow-xl">
         <div className="space-y-1">

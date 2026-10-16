@@ -84,7 +84,7 @@ export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSe
   };
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="p-6 lg:px-10 gap-5 w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto">
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -117,14 +117,14 @@ export const VendorsPage: React.FC<VendorsPageProps> = ({ onOpenReview, globalSe
       </div>
 
       {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <div className="relative w-full max-w-2xl">
+        <Search className="size-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter vendors by name or default category..."
-          className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-white dark:bg-[#0c1813] text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          className="w-full pl-12 pr-4 py-3 text-sm rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-white dark:bg-[#0c1813] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
         />
       </div>
 

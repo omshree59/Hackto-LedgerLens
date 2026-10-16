@@ -107,7 +107,7 @@ export const SettingsPage: React.FC = () => {
   const storage = settingsData?.storage;
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 lg:px-10 gap-6 w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto">
       {/* Top Banner */}
       <div>
         <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">

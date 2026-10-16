@@ -115,7 +115,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   }, [data?.monthlyTrend]);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 lg:px-10 gap-6 w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto">
       {/* Top Banner: Date Range & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -399,7 +399,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       </div>
 
       {/* Recent Documents Table & Processing Status */}
-      <WorkspaceCard spotlightColor="#00D6A0" className="space-y-4">
+      <WorkspaceCard spotlightColor="#00D6A0" className="space-y-4 flex-1 flex flex-col">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-extrabold text-white tracking-tight">Recent Documents</h3>

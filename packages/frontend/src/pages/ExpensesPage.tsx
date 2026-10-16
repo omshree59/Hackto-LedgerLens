@@ -145,9 +145,9 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
   };
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="p-6 lg:px-10 gap-4 w-full h-full min-h-0 flex-1 flex flex-col overflow-hidden">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-sm">
             Expense Tracker
@@ -178,7 +178,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
       </div>
 
       {/* Summary Stat Card */}
-      <WorkspaceCard spotlightColor="#059669" className="!p-4 flex flex-wrap items-center justify-between gap-4">
+      <WorkspaceCard spotlightColor="#059669" className="!p-4 flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3">
           <div className="size-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center">
             <Wallet className="size-5" />
@@ -201,15 +201,15 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
       </WorkspaceCard>
 
       {/* Filter Bar */}
-      <WorkspaceCard spotlightColor="#059669" className="!p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex-1 min-w-[200px] relative">
-          <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <WorkspaceCard spotlightColor="#059669" className="!p-4 flex flex-wrap items-center justify-between gap-3 text-sm shrink-0">
+        <div className="flex-1 min-w-[280px] relative">
+          <Search className="size-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search vendor or description..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full pl-12 pr-4 py-3 text-sm rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
         </div>
 
@@ -217,7 +217,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
           <select
             value={category}
             onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300"
+            className="px-3 py-3 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300"
           >
             <option value="">All Categories</option>
             <option value="Software">Software</option>
@@ -233,7 +233,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
             type="date"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300 font-mono"
+            className="px-3 py-3 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300 font-mono"
             title="Start date"
           />
           <span className="text-slate-400">to</span>
@@ -241,15 +241,15 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
             type="date"
             value={endDate}
             onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300 font-mono"
+            className="px-3 py-3 rounded-xl border border-slate-200 dark:border-[#1e3c2c] bg-slate-50 dark:bg-[#091510] text-slate-700 dark:text-slate-300 font-mono"
             title="End date"
           />
         </div>
       </WorkspaceCard>
 
-      {/* Expenses Table */}
-      <WorkspaceCard spotlightColor="#059669" className="!p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Expenses Table — stretches to the bottom of the workspace */}
+      <WorkspaceCard spotlightColor="#059669" className="!p-0 overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto flex flex-col">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#0d221a]/90 text-emerald-300/90 uppercase text-[11px] font-extrabold tracking-wider border-b border-emerald-500/20">
               <tr>
@@ -326,10 +326,63 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({ onOpenReview, global
               )}
             </tbody>
           </table>
+
+          {/* Lower Space Filler in Expenses Table when fewer than 6 rows */}
+          {expenses.length < 6 && (
+            <div className="p-5 flex-1 min-h-[12rem] grid grid-cols-1 lg:grid-cols-12 gap-5 border-t border-white/10 bg-[#06120e]/45">
+              <div className="lg:col-span-7 p-5 rounded-2xl bg-[#091a14]/85 border border-emerald-500/25 flex flex-col justify-between space-y-3">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 block">
+                    Ledger Summary
+                  </span>
+                  <h3 className="text-base font-black text-white mt-0.5">
+                    Verified Expense Records ({total})
+                  </h3>
+                  <p className="text-xs font-bold text-slate-300 mt-1">
+                    Every approved invoice or receipt is automatically recorded here and linked to its original source PDF/image.
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-white/10 text-xs">
+                  <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Transactions</span>
+                    <span className="font-mono font-black text-white mt-0.5 block">{total}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block">Latest Vendor</span>
+                    <span className="font-extrabold text-white mt-0.5 block truncate">
+                      {expenses[0]?.vendor_name || '—'}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30">
+                    <span className="text-[10px] font-extrabold uppercase text-emerald-300 block">Total Recorded</span>
+                    <span className="font-mono font-black text-emerald-300 mt-0.5 block">
+                      {expenses[0]?.currency && expenses[0].currency !== 'USD' ? `${expenses[0].currency} ` : '$'}
+                      {totalSum.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onClick={handleOpenCreate}
+                className="lg:col-span-5 p-5 rounded-2xl border-2 border-dashed border-emerald-500/35 hover:border-emerald-400 bg-[#071611]/70 hover:bg-[#0b221a]/80 transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-2"
+              >
+                <div className="size-11 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 flex items-center justify-center">
+                  <Plus className="size-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">+ Record Manual Expense</h4>
+                  <p className="text-xs font-bold text-slate-300 mt-0.5">
+                    Add cash outlays or card charges directly to your local SQLite ledger
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pagination */}
-        <div className="p-3.5 px-4 bg-slate-50 dark:bg-[#091510] border-t border-slate-200 dark:border-[#193627] flex items-center justify-between text-xs text-slate-500">
+        <div className="p-4 px-5 bg-[#07130f]/90 border-t border-emerald-500/20 flex items-center justify-between text-xs font-bold text-slate-300 shrink-0">
           <span>Showing {expenses.length} of {total} expenses</span>
           <div className="flex items-center gap-1.5">
             <button

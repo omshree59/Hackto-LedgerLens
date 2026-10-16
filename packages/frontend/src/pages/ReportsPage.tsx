@@ -54,7 +54,7 @@ export const ReportsPage: React.FC = () => {
   const totalYearSpend = (data?.monthlyData || []).reduce((acc: number, cur: any) => acc + (cur.amount || 0), 0);
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 lg:px-10 gap-6 w-full h-full min-h-0 flex-1 flex flex-col overflow-y-auto">
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -163,46 +163,46 @@ export const ReportsPage: React.FC = () => {
       </WorkspaceCard>
 
       {/* Category & Vendor Breakdown Side-by-Side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
         {/* Category breakdown table */}
-        <WorkspaceCard spotlightColor="#8b5cf6" className="space-y-3">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">Spending by Category</h3>
-          <div className="divide-y divide-slate-100 dark:divide-[#152e23] text-xs">
+        <WorkspaceCard spotlightColor="#8b5cf6" className="space-y-3 flex flex-col">
+          <h3 className="text-base font-extrabold text-white">Spending by Category</h3>
+          <div className="divide-y divide-white/10 text-xs flex-1">
             {data?.categoryData?.map((c: any) => (
-              <div key={c.category} className="py-2 flex items-center justify-between">
+              <div key={c.category} className="py-2.5 flex items-center justify-between">
                 <div>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{c.category}</span>
-                  <span className="text-[11px] text-slate-400 ml-1.5">({c.count} records)</span>
+                  <span className="font-extrabold text-white">{c.category}</span>
+                  <span className="text-[11px] font-bold text-slate-300 ml-1.5">({c.count} records)</span>
                 </div>
                 <div className="text-right">
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">${c.total.toFixed(2)}</span>
-                  <span className="text-[10px] text-slate-400 block">
+                  <span className="font-mono font-black text-emerald-300">{c.total.toFixed(2)}</span>
+                  <span className="text-[10px] font-bold text-slate-300 block">
                     {totalYearSpend > 0 ? `${((c.total / totalYearSpend) * 100).toFixed(1)}%` : '0%'}
                   </span>
                 </div>
               </div>
             ))}
             {(!data?.categoryData || data.categoryData.length === 0) && (
-              <div className="py-6 text-center text-slate-400">No category records</div>
+              <div className="py-6 text-center font-bold text-slate-300">No category records</div>
             )}
           </div>
         </WorkspaceCard>
 
         {/* Top Vendors breakdown table */}
-        <WorkspaceCard spotlightColor="#06B6D4" className="space-y-3">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">Top Vendors by Spend</h3>
-          <div className="divide-y divide-slate-100 dark:divide-[#152e23] text-xs">
+        <WorkspaceCard spotlightColor="#06B6D4" className="space-y-3 flex flex-col">
+          <h3 className="text-base font-extrabold text-white">Top Vendors by Spend</h3>
+          <div className="divide-y divide-white/10 text-xs flex-1">
             {data?.vendorData?.map((v: any) => (
-              <div key={v.vendor_name} className="py-2 flex items-center justify-between">
+              <div key={v.vendor_name} className="py-2.5 flex items-center justify-between">
                 <div>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">{v.vendor_name}</span>
-                  <span className="text-[11px] text-slate-400 ml-1.5">({v.count} payments)</span>
+                  <span className="font-extrabold text-white">{v.vendor_name}</span>
+                  <span className="text-[11px] font-bold text-slate-300 ml-1.5">({v.count} payments)</span>
                 </div>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">${v.total.toFixed(2)}</span>
+                <span className="font-mono font-black text-white">{v.total.toFixed(2)}</span>
               </div>
             ))}
             {(!data?.vendorData || data.vendorData.length === 0) && (
-              <div className="py-6 text-center text-slate-400">No vendor records</div>
+              <div className="py-6 text-center font-bold text-slate-300">No vendor records</div>
             )}
           </div>
         </WorkspaceCard>

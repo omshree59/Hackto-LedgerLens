@@ -327,15 +327,15 @@ export const App: React.FC = () => {
             </div>
 
             {/* Center: Search Field */}
-            <div className="hidden lg:flex items-center w-80 max-w-sm">
+            <div className="hidden lg:flex items-center flex-1 max-w-xl mx-6">
               <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-500" />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-500" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder={`Search ${activeCoinMeta.name.toLowerCase()}...`}
-                  className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-[#030807] border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-emerald-500 outline-none transition-colors"
+                  className="w-full pl-11 pr-4 py-2 rounded-xl bg-[#030807] border border-slate-800 text-sm text-white placeholder-slate-500 focus:border-emerald-500 outline-none transition-colors"
                 />
               </div>
             </div>
@@ -372,8 +372,8 @@ export const App: React.FC = () => {
           </header>
 
           {/* Main Full-Screen Workspace Body over the live 3D cosmic background */}
-          <main className="relative z-10 flex-1 overflow-y-auto bg-transparent text-slate-100">
-            <div key={`${currentTab}-${workspaceRefreshKey}`} className="animate-in fade-in duration-200">
+          <main className="relative z-10 flex-1 min-h-0 flex flex-col overflow-hidden bg-transparent text-slate-100">
+            <div key={`${currentTab}-${workspaceRefreshKey}`} className="h-full min-h-0 flex-1 flex flex-col overflow-hidden animate-in fade-in duration-200">
               {renderWorkspaceContent()}
             </div>
           </main>
