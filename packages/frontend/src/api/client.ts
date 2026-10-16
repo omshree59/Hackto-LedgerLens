@@ -43,6 +43,9 @@ export const api = {
   // Health & AI status
   getHealth: () => request<{ status: string; database: string }>('/health'),
   getOllamaStatus: () => request<OllamaStatus>('/ollama/status'),
+  startOllama: () => request<{ success: boolean; started: boolean; error?: string; status: OllamaStatus }>('/ollama/start', {
+    method: 'POST'
+  }),
   setOllamaModel: (model: string) => request<{ success: boolean; selectedModel: string }>('/ollama/set-model', {
     method: 'POST',
     body: JSON.stringify({ model })

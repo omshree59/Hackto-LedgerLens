@@ -37,6 +37,20 @@ router.get('/ollama/status', async (req, res) => {
   }
 });
 
+router.post('/ollama/start', async (_req, res) => {
+  try {
+    const result = await OllamaService.ensureRunning();
+    res.status(result.health.isOnline ? 200 : 503).json({
+      success: result.health.isOnline,
+      started: result.started,
+      error: result.error,
+      status: result.health
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to start Ollama' });
+  }
+});
+
 router.post('/ollama/set-model', (req, res) => {
   const { model } = req.body;
   if (!model || typeof model !== 'string') {

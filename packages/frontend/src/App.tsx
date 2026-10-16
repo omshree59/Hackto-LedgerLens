@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { NavItem, OllamaStatus } from './types';
 import { CoinRackViewer, COIN_FEATURES } from './components/coins/CoinRackViewer';
 import { UploadModal } from './components/upload/UploadModal';
 import { ReviewWorkspaceModal } from './components/review/ReviewWorkspaceModal';
+import { AiStatusPill } from './components/layout/AiStatusPill';
 
 import { OverviewPage } from './pages/OverviewPage';
 import { InvoicesPage } from './pages/InvoicesPage';
@@ -50,6 +51,8 @@ export const App: React.FC = () => {
   // Status & badge counts
   const [reviewCount, setReviewCount] = useState(0);
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const [isStartingOllama, setIsStartingOllama] = useState(false);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -61,22 +64,53 @@ export const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
-  useEffect(() => {
-    loadAppStatus();
-    const interval = setInterval(loadAppStatus, 8000);
-    return () => clearInterval(interval);
+  // Poll fast (2s) while anything is down so a late-started backend/Ollama is picked up
+  // immediately, then relax to 8s once everything is healthy.
+  const healthyRef = useRef(false);
+
+  const loadAppStatus = useCallback(async () => {
+    const [ollama, reviewDocs] = await Promise.all([
+      api.getOllamaStatus().catch(() => null),
+      api.getDocuments({ status: 'needs_review', limit: 1 }).catch(() => null)
+    ]);
+
+    const reachable = ollama !== null || reviewDocs !== null;
+    setBackendOnline(reachable);
+    // Never keep a stale "Active" after the API goes away
+    setOllamaStatus(ollama);
+    if (reviewDocs) setReviewCount(reviewDocs.total);
+
+    healthyRef.current = reachable && !!ollama?.isOnline;
   }, []);
 
-  const loadAppStatus = async () => {
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const tick = async () => {
+      await loadAppStatus();
+      if (!cancelled) timer = setTimeout(tick, healthyRef.current ? 8000 : 2000);
+    };
+    tick();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [loadAppStatus]);
+
+  const handleStartOllama = useCallback(async () => {
+    setIsStartingOllama(true);
     try {
-      const [ollama, reviewDocs] = await Promise.all([
-        api.getOllamaStatus().catch(() => null),
-        api.getDocuments({ status: 'needs_review', limit: 1 }).catch(() => null)
-      ]);
-      if (ollama) setOllamaStatus(ollama);
-      if (reviewDocs) setReviewCount(reviewDocs.total);
-    } catch {}
-  };
+      const res = await api.startOllama();
+      setOllamaStatus(res.status);
+    } catch {
+      // Status poll will report the real state
+    } finally {
+      setIsStartingOllama(false);
+      loadAppStatus();
+    }
+  }, [loadAppStatus]);
 
   // Keyboard navigation: Escape key returns to the conveyor if no modal is active
   useEffect(() => {
@@ -181,6 +215,9 @@ export const App: React.FC = () => {
             removedCoins={removedCoins}
             onRestoreCoins={handleRestoreCoins}
             ollamaStatus={ollamaStatus}
+            backendOnline={backendOnline}
+            isStartingOllama={isStartingOllama}
+            onStartOllama={handleStartOllama}
             onOpenUpload={() => setIsUploadOpen(true)}
             reviewCount={reviewCount}
           />
@@ -287,12 +324,14 @@ export const App: React.FC = () => {
 
             {/* Right: Actions, AI Status, Quick Import, Theme */}
             <div className="flex items-center gap-3">
-              {/* Ollama Status Pill */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#091512] border border-slate-800 text-xs font-mono">
-                <span className={`size-2 rounded-full ${ollamaStatus?.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-                <span className="text-slate-300">Gemma 3:4b</span>
-                <span className="text-emerald-400 font-semibold">{ollamaStatus?.isOnline ? 'Active' : 'Offline'}</span>
-              </div>
+              {/* Backend / Ollama Status Pill */}
+              <AiStatusPill
+                backendOnline={backendOnline}
+                ollamaStatus={ollamaStatus}
+                isStarting={isStartingOllama}
+                onStartOllama={handleStartOllama}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#091512] border border-slate-800 text-xs font-mono"
+              />
 
               {/* Quick Import CTA */}
               <button

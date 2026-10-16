@@ -8,6 +8,10 @@ export function getDb(): Database.Database {
   if (!dbInstance) {
     dbInstance = new Database(DB_FILE);
     dbInstance.pragma('journal_mode = WAL');
+    dbInstance.pragma('synchronous = NORMAL');
+    dbInstance.pragma('busy_timeout = 5000');
+    dbInstance.pragma('temp_store = MEMORY');
+    dbInstance.pragma('cache_size = -16000');
     dbInstance.pragma('foreign_keys = ON');
     initSchema(dbInstance);
   }

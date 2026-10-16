@@ -8,10 +8,53 @@ import { ExpenseService } from './expense.service.js';
 import type { ExtractedInvoiceData } from './validation.schemas.js';
 
 export class ProcessorService {
+  private static readonly MAX_CONCURRENT = 2;
+  private static activeCount = 0;
+  private static readonly inFlight = new Map<string, Promise<void>>();
+  private static readonly waitQueue: Array<() => void> = [];
+
+  private static acquireSlot(): Promise<void> {
+    if (this.activeCount < this.MAX_CONCURRENT) {
+      this.activeCount++;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.waitQueue.push(() => {
+        this.activeCount++;
+        resolve();
+      });
+    });
+  }
+
+  private static releaseSlot(): void {
+    this.activeCount = Math.max(0, this.activeCount - 1);
+    const next = this.waitQueue.shift();
+    if (next) next();
+  }
+
   /**
-   * Run the full end-to-end extraction and processing pipeline on a document
+   * Run the full end-to-end extraction and processing pipeline on a document.
+   * Deduplicates concurrent calls for the same document and bounds concurrency.
    */
-  public static async processDocument(docId: string): Promise<void> {
+  public static processDocument(docId: string): Promise<void> {
+    const existing = this.inFlight.get(docId);
+    if (existing) return existing;
+
+    const task = (async () => {
+      await this.acquireSlot();
+      try {
+        await this.runPipeline(docId);
+      } finally {
+        this.releaseSlot();
+        this.inFlight.delete(docId);
+      }
+    })();
+
+    this.inFlight.set(docId, task);
+    return task;
+  }
+
+  private static async runPipeline(docId: string): Promise<void> {
     const db = getDb();
     const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(docId) as any;
 
@@ -196,10 +239,28 @@ export class ProcessorService {
           ExpenseService.upsertVendor(extractedData.vendor_name, extractedData.category || undefined);
         }
 
-        // Determine final document status
-        // If there are validation warnings or duplicate candidate or rule requested review: 'needs_review'
-        const hasCriticalWarnings = extraction.validationWarnings.length > 0 || dupCheck.isDuplicate || ruleResult.flagNeedsReview;
-        const newStatus = hasCriticalWarnings ? 'needs_review' : 'needs_review'; // Default requires user approval in review workspace
+        // Determine final document status:
+        // Honor `auto_approve_high_confidence` when there are no warnings, no duplicate collision,
+        // no rule forcing review, and both vendor & total confidence are high (>= 0.85).
+        const hasCriticalWarnings =
+          extraction.validationWarnings.length > 0 ||
+          dupCheck.isDuplicate ||
+          ruleResult.flagNeedsReview;
+
+        const autoApproveSetting = db
+          .prepare('SELECT value FROM app_settings WHERE key = ?')
+          .get('auto_approve_high_confidence') as { value: string } | undefined;
+        const autoApproveEnabled = autoApproveSetting?.value === '1' || autoApproveSetting?.value === 'true';
+        const vendorConf = extraction.confidenceScores.vendor_name ?? 0;
+        const totalConf = extraction.confidenceScores.total_amount ?? 0;
+        const canAutoApprove =
+          autoApproveEnabled &&
+          !hasCriticalWarnings &&
+          vendorConf >= 0.85 &&
+          totalConf >= 0.85 &&
+          (extractedData.total_amount ?? 0) > 0;
+
+        const newStatus = canAutoApprove ? 'approved' : 'needs_review';
 
         db.prepare(`
           UPDATE documents
@@ -208,6 +269,21 @@ export class ProcessorService {
               updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
           WHERE id = ?
         `).run(newStatus, extractedData.document_type || doc.document_type, docId);
+
+        if (canAutoApprove) {
+          const vendorName = extractedData.vendor_name || 'Unknown Vendor';
+          const expenseDate = extractedData.invoice_date || (doc.created_at ? String(doc.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
+          ExpenseService.syncDocumentToExpense(
+            docId,
+            vendorName,
+            expenseDate,
+            extractedData.total_amount || 0,
+            extractedData.currency || 'USD',
+            extractedData.category || 'Other',
+            extractedData.description || `${(extractedData.document_type || doc.document_type) === 'receipt' ? 'Receipt' : 'Invoice'} from ${vendorName}`,
+            extractedData.tags || []
+          );
+        }
 
         // Complete processing job
         db.prepare(`

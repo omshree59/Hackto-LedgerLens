@@ -23,6 +23,7 @@ export const SettingsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState('gemma3:4b');
   const [modelChangeStatus, setModelChangeStatus] = useState<string | null>(null);
+  const [autoApproveHighConf, setAutoApproveHighConf] = useState(false);
   const [organizeResult, setOrganizeResult] = useState<{ message: string; destination: string } | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -38,6 +39,7 @@ export const SettingsPage: React.FC = () => {
       if (res.ollama?.selectedModel) {
         setSelectedModel(res.ollama.selectedModel);
       }
+      setAutoApproveHighConf(res.settings?.auto_approve_high_confidence === '1');
     } catch (err) {
       console.error('Failed to load settings:', err);
     } finally {
@@ -54,6 +56,23 @@ export const SettingsPage: React.FC = () => {
       setTimeout(() => setModelChangeStatus(null), 3000);
     } catch (err: any) {
       setModelChangeStatus(`Failed to update model: ${err.message}`);
+    }
+  };
+
+  const handleToggleAutoApprove = async () => {
+    const next = !autoApproveHighConf;
+    setAutoApproveHighConf(next);
+    try {
+      await api.updateSettings({ auto_approve_high_confidence: next ? '1' : '0' });
+      setActionFeedback({
+        type: 'success',
+        text: next
+          ? 'Auto-approve enabled for high-confidence extractions (≥ 85% confidence, zero warnings).'
+          : 'Auto-approve disabled; all extracted documents will wait in Review Queue.'
+      });
+    } catch (err: any) {
+      setAutoApproveHighConf(!next);
+      setActionFeedback({ type: 'error', text: err.message || 'Failed to update auto-approve setting' });
     }
   };
 
@@ -178,6 +197,29 @@ export const SettingsPage: React.FC = () => {
               {modelChangeStatus}
             </div>
           )}
+
+          {/* Auto-Approve High-Confidence Documents Toggle */}
+          <div className="pt-2 border-t border-slate-200/70 dark:border-[#1e3c2c] flex items-center justify-between gap-3">
+            <div>
+              <span className="font-medium text-slate-700 dark:text-slate-200 block">
+                Auto-Approve High-Confidence Invoices
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Automatically approve and record expenses when vendor &amp; total confidence ≥ 85% with zero warnings
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleAutoApprove}
+              className={`px-3 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors shrink-0 ${
+                autoApproveHighConf
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                  : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+              }`}
+            >
+              {autoApproveHighConf ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
 
           {/* If Ollama is offline, show helpful terminal command */}
           {!ollama?.isOnline && (

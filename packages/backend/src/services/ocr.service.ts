@@ -11,6 +11,21 @@ export interface OcrResult {
 }
 
 export class OcrService {
+  private static workerPromise: Promise<Tesseract.Worker> | null = null;
+  private static workerQueue: Promise<unknown> = Promise.resolve();
+
+  private static getWorker(): Promise<Tesseract.Worker> {
+    if (!this.workerPromise) {
+      this.workerPromise = Tesseract.createWorker('eng', 1, {
+        logger: () => {}
+      }).catch((err) => {
+        this.workerPromise = null;
+        throw err;
+      });
+    }
+    return this.workerPromise;
+  }
+
   /**
    * Extract text from PDF or Image file
    */
@@ -75,26 +90,31 @@ export class OcrService {
   }
 
   /**
-   * Perform OCR on an image file using Tesseract.js
+   * Perform OCR on an image file using a persistent Tesseract.js worker
    */
   private static async extractFromImage(filePath: string): Promise<OcrResult> {
-    try {
-      const result = await Tesseract.recognize(filePath, 'eng', {
-        logger: () => {} // quiet progress logger
-      });
+    const run = async (): Promise<OcrResult> => {
+      try {
+        const worker = await this.getWorker();
+        const result = await worker.recognize(filePath);
+        const cleanedText = this.normalizeText(result.data.text || '');
+        const confidence = (result.data.confidence || 75) / 100;
 
-      const cleanedText = this.normalizeText(result.data.text || '');
-      const confidence = (result.data.confidence || 75) / 100;
+        return {
+          text: cleanedText,
+          confidence: Math.min(Math.max(confidence, 0.1), 0.99),
+          pageCount: 1,
+          isScannedPdf: false
+        };
+      } catch (err: any) {
+        this.workerPromise = null;
+        throw new Error(`Image OCR failed: ${err.message || String(err)}`);
+      }
+    };
 
-      return {
-        text: cleanedText,
-        confidence: Math.min(Math.max(confidence, 0.1), 0.99),
-        pageCount: 1,
-        isScannedPdf: false
-      };
-    } catch (err: any) {
-      throw new Error(`Image OCR failed: ${err.message || String(err)}`);
-    }
+    const queued = this.workerQueue.then(run, run);
+    this.workerQueue = queued.catch(() => {});
+    return queued;
   }
 
   /**

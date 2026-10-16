@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { CONFIG, UPLOADS_DIR } from './config.js';
 import { getDb } from './db/index.js';
+import { OllamaService } from './services/ollama.service.js';
 
 import healthRouter from './routes/health.router.js';
 import documentsRouter from './routes/documents.router.js';
@@ -79,6 +80,22 @@ if (process.env.NODE_ENV !== 'test') {
     console.log(`  LedgerLens Backend running at http://${CONFIG.HOST}:${CONFIG.PORT}`);
     console.log(`  Local AI target: ${CONFIG.OLLAMA_BASE_URL} (${CONFIG.DEFAULT_MODEL})`);
     console.log(`===================================================`);
+
+    // Dev convenience: bring the local Ollama daemon up if it is installed but not running.
+    if (process.env.AUTO_START_OLLAMA !== 'false') {
+      OllamaService.ensureRunning()
+        .then((r) => {
+          if (r.health.isOnline) {
+            console.log(r.started ? '  Ollama was offline - started it automatically.' : '  Ollama is online.');
+            if (!r.health.modelFound) {
+              console.warn(`  Model "${r.health.selectedModel}" is missing. Run: ollama pull ${r.health.selectedModel}`);
+            }
+          } else {
+            console.warn(`  Ollama is offline: ${r.error || r.health.error || 'unreachable'}`);
+          }
+        })
+        .catch((err) => console.warn('  Ollama auto-start failed:', err?.message || err));
+    }
   });
 
   // Graceful shutdown

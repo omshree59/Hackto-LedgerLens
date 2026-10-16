@@ -645,21 +645,26 @@ router.post('/bulk', (req, res) => {
   }
 
   if (action === 'delete') {
+    const filesToRemove: string[] = [];
     const deleteTx = db.transaction(() => {
       for (const id of ids) {
         const doc = db.prepare('SELECT storage_path FROM documents WHERE id = ?').get(id) as any;
+        if (doc?.storage_path) filesToRemove.push(doc.storage_path);
         db.prepare('DELETE FROM expenses WHERE document_id = ?').run(id);
         db.prepare('DELETE FROM line_items WHERE document_id = ?').run(id);
         db.prepare('DELETE FROM extracted_data WHERE document_id = ?').run(id);
         db.prepare('DELETE FROM processing_jobs WHERE document_id = ?').run(id);
+        db.prepare('DELETE FROM rule_history WHERE document_id = ?').run(id);
         db.prepare('DELETE FROM documents WHERE id = ?').run(id);
-
-        if (doc && doc.storage_path && fs.existsSync(doc.storage_path)) {
-          try { fs.unlinkSync(doc.storage_path); } catch {}
-        }
       }
     });
     deleteTx();
+
+    for (const filePath of filesToRemove) {
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch {}
+      }
+    }
     return res.json({ success: true, message: `Deleted ${ids.length} documents` });
   }
 

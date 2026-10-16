@@ -6,6 +6,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { NavItem, OllamaStatus } from '../../types';
 import { COIN_FEATURES, type CoinFeature } from './coinData';
+import { AiStatusPill } from '../layout/AiStatusPill';
 import {
   Play,
   Pause,
@@ -77,6 +78,9 @@ interface CoinRackViewerProps {
   removedCoins: string[];
   onRestoreCoins: () => void;
   ollamaStatus: OllamaStatus | null;
+  backendOnline: boolean | null;
+  isStartingOllama?: boolean;
+  onStartOllama?: () => void;
   onOpenUpload: () => void;
   reviewCount: number;
 }
@@ -87,6 +91,9 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
   removedCoins,
   onRestoreCoins,
   ollamaStatus,
+  backendOnline,
+  isStartingOllama = false,
+  onStartOllama,
   onOpenUpload,
   reviewCount
 }) => {
@@ -1766,12 +1773,14 @@ export const CoinRackViewer: React.FC<CoinRackViewerProps> = ({
             <span className="text-[10px] text-slate-400">FPS</span>
           </div>
 
-          {/* Ollama Status Pill */}
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0b1714]/80 backdrop-blur-md border border-emerald-500/20 text-xs font-mono">
-            <span className={`size-2 rounded-full ${ollamaStatus?.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-            <span className="text-slate-300">Gemma 3:4b</span>
-            <span className="text-emerald-400 font-semibold">{ollamaStatus?.isOnline ? 'Active' : 'Offline'}</span>
-          </div>
+          {/* Backend / Ollama Status Pill */}
+          <AiStatusPill
+            backendOnline={backendOnline}
+            ollamaStatus={ollamaStatus}
+            isStarting={isStartingOllama}
+            onStartOllama={onStartOllama}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#0b1714]/80 backdrop-blur-md border border-emerald-500/20 text-xs font-mono"
+          />
 
           {/* Review Queue Count Pill if any */}
           {reviewCount > 0 && (
