@@ -25,9 +25,7 @@ export const LocalAiPage: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Diagnostic Playground state
-  const [testPrompt, setTestPrompt] = useState(
-    'Extract the vendor, date, and total from this snippet: "ACME Cloud Services Inc, Date: 2026-03-15, Total Due: $1,420.50 USD". Output concise JSON.'
-  );
+  const [testPrompt, setTestPrompt] = useState('');
   const [temperature, setTemperature] = useState(0.1);
   const [isRunningInference, setIsRunningInference] = useState(false);
   const [inferenceResult, setInferenceResult] = useState<{
@@ -319,18 +317,14 @@ export const LocalAiPage: React.FC = () => {
                 <Activity className="size-4 text-emerald-400" />
                 Live Inference Playground
               </h2>
-              <div className="flex items-center gap-2">
+              {testPrompt && (
                 <button
-                  onClick={() =>
-                    setTestPrompt(
-                      'Extract the vendor, date, and total from this snippet: "ACME Cloud Services Inc, Date: 2026-03-15, Total Due: $1,420.50 USD". Output concise JSON.'
-                    )
-                  }
+                  onClick={() => setTestPrompt('')}
                   className="text-[11px] text-slate-400 hover:text-emerald-400 underline cursor-pointer"
                 >
-                  Load Sample Invoice
+                  Clear Prompt
                 </button>
-              </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -338,6 +332,7 @@ export const LocalAiPage: React.FC = () => {
               <textarea
                 value={testPrompt}
                 onChange={e => setTestPrompt(e.target.value)}
+                placeholder="Type your own prompt or paste text from one of your invoices to test local Gemma inference..."
                 rows={3}
                 className="w-full p-3 rounded-xl bg-[#050a0b] border border-slate-700 text-white font-mono text-xs focus:border-emerald-500 outline-none resize-none"
               />

@@ -208,7 +208,4 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ confirm: 'RESET_ALL_DATA' })
   }),
-  seedDemo: () => request<{ success: boolean; message: string }>('/settings/seed-demo', {
-    method: 'POST'
-  })
 };

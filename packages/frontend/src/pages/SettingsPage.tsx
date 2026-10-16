@@ -87,17 +87,6 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSeedDemo = async () => {
-    setActionFeedback(null);
-    try {
-      await api.seedDemo();
-      setActionFeedback({ type: 'success', text: 'Realistic demo records seeded successfully (labeled Demo)' });
-      loadSettings();
-    } catch (err: any) {
-      setActionFeedback({ type: 'error', text: err.message || 'Demo seed failed' });
-    }
-  };
-
   const handleResetData = async () => {
     const confirm = window.prompt('WARNING: This will permanently delete all stored invoices, expenses, vendors, and files on disk.\nType "RESET_ALL_DATA" to proceed:');
     if (confirm !== 'RESET_ALL_DATA') {
@@ -328,44 +317,24 @@ export const SettingsPage: React.FC = () => {
         </div>
       </WorkspaceCard>
 
-      {/* Card 4: Demo Data & Danger Zone */}
+      {/* Card 4: User History & Danger Zone */}
       <WorkspaceCard spotlightColor="#f43f5e" className="!p-6 space-y-4">
-        <h3 className="font-bold text-sm text-slate-900 dark:text-white">Data Management</h3>
+        <h3 className="font-bold text-sm text-slate-900 dark:text-white">User History &amp; Data Management</h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          {/* Seed Demo Data */}
-          <div className="p-4 rounded-xl border border-slate-200 dark:border-[#1e3c2c] space-y-2">
-            <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <Sparkles className="size-3.5 text-emerald-500" />
-              <span>Load Realistic Demo Data</span>
-            </h4>
-            <p className="text-slate-400 text-[11px]">
-              Populates realistic freelancer & business invoices (Cloudflare, AWS, Apple, etc.) clearly tagged as Demo.
-            </p>
-            <button
-              onClick={handleSeedDemo}
-              className="px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 font-semibold cursor-pointer"
-            >
-              Seed Demo Records
-            </button>
-          </div>
-
-          {/* Reset All Data */}
-          <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-950/60 bg-rose-50/20 dark:bg-rose-950/10 space-y-2">
-            <h4 className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
-              <Trash2 className="size-3.5" />
-              <span>Reset All Records</span>
-            </h4>
-            <p className="text-slate-400 text-[11px]">
-              Permanently purges all database tables, OCR records, expenses, and deletes uploaded files on disk.
-            </p>
-            <button
-              onClick={handleResetData}
-              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold cursor-pointer"
-            >
-              Reset Application Data
-            </button>
-          </div>
+        <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-950/60 bg-rose-50/20 dark:bg-rose-950/10 space-y-2 text-xs">
+          <h4 className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+            <Trash2 className="size-3.5" />
+            <span>Clear All User History &amp; Records</span>
+          </h4>
+          <p className="text-slate-400 text-[11px]">
+            LedgerLens only stores documents, expenses, vendors, and rules that you create or upload. Clicking below permanently purges your stored history and deletes uploaded files on disk.
+          </p>
+          <button
+            onClick={handleResetData}
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold cursor-pointer"
+          >
+            Reset Application Data
+          </button>
         </div>
       </WorkspaceCard>
     </div>

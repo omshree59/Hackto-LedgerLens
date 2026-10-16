@@ -13,7 +13,11 @@ export const ROOT_DIR = path.resolve(__dirname, '../../..');
 export const DATA_DIR = process.env.DATA_DIR || path.join(ROOT_DIR, 'data');
 export const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 export const EXPORTS_DIR = path.join(DATA_DIR, 'exports');
-export const DB_FILE = process.env.DB_FILE || path.join(DATA_DIR, 'ledgerlens.sqlite');
+export const DB_FILE =
+  process.env.DB_FILE ||
+  (process.env.NODE_ENV === 'test'
+    ? path.join(DATA_DIR, 'ledgerlens.test.sqlite')
+    : path.join(DATA_DIR, 'ledgerlens.sqlite'));
 
 // Ensure required directories exist
 [DATA_DIR, UPLOADS_DIR, EXPORTS_DIR].forEach((dir) => {
