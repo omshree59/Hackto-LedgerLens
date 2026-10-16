@@ -65,8 +65,20 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
     loadDocuments();
   }, [page, search, statusFilter, categoryFilter, sortBy, sortOrder]);
 
-  const loadDocuments = async () => {
-    setIsLoading(true);
+  const hasProcessingItems = items.some(
+    i => i.status === 'uploaded' || i.status === 'processing'
+  );
+
+  useEffect(() => {
+    if (!hasProcessingItems) return;
+    const timer = setInterval(() => {
+      loadDocuments(true);
+    }, 1200);
+    return () => clearInterval(timer);
+  }, [hasProcessingItems, page, search, statusFilter, categoryFilter, sortBy, sortOrder]);
+
+  const loadDocuments = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const res = await api.getDocuments({
         page,
@@ -228,7 +240,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
           </select>
 
           <button
-            onClick={loadDocuments}
+            onClick={() => loadDocuments(false)}
             className="p-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
             title="Refresh"
           >
@@ -364,7 +376,7 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                     </td>
                     <td className="py-3 px-3 font-mono font-bold text-slate-900 dark:text-white">
                       {doc.total_amount !== null && doc.total_amount !== undefined
-                        ? `$${doc.total_amount.toFixed(2)}`
+                        ? `${doc.currency && doc.currency !== 'USD' ? `${doc.currency} ` : '$'}${doc.total_amount.toFixed(2)}`
                         : <span className="text-slate-400">—</span>}
                     </td>
                     <td className="py-3 px-3">
@@ -373,11 +385,13 @@ export const DocumentTable: React.FC<DocumentTableProps> = ({
                           ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                           : doc.status === 'needs_review'
                           ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                          : doc.status === 'processing'
+                          : doc.status === 'processing' || doc.status === 'uploaded'
                           ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 animate-pulse'
                           : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
                       }`}>
-                        {doc.status.replace('_', ' ')}
+                        {doc.status === 'uploaded' || doc.status === 'processing'
+                          ? 'extracting…'
+                          : doc.status.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>

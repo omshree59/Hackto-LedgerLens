@@ -1,4 +1,6 @@
 import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import { CONFIG } from '../config.js';
 import { getDb } from '../db/index.js';
 import {
@@ -32,6 +34,12 @@ export interface OllamaStartResult {
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function promptToSendOrDefault(userPrompt: string, attempt: number): string {
+  return attempt === 1
+    ? userPrompt
+    : `${userPrompt}\n\nReturn STRICT VALID JSON matching the schema.`;
+}
 
 const INVOICE_JSON_SCHEMA = {
   type: 'object',
@@ -164,8 +172,21 @@ export class OllamaService {
 
       let spawnError: string | undefined;
       try {
-        const child = spawn('ollama', ['serve'], {
-          detached: true,
+        // On Windows, `detached: true` sets DETACHED_PROCESS in libuv which overrides
+        // CREATE_NO_WINDOW (`windowsHide: true`) and causes `ollama.exe` / `llama-server.exe`
+        // to pop up a visible Command Prompt window. Prefer the GUI tray binary
+        // (`ollama app.exe`) on Windows and never set `detached: true` on win32.
+        const isWin = process.platform === 'win32';
+        const winGuiApp = isWin && process.env.LOCALAPPDATA
+          ? path.join(process.env.LOCALAPPDATA, 'Programs', 'Ollama', 'ollama app.exe')
+          : '';
+        const useWinGui = isWin && winGuiApp && fs.existsSync(winGuiApp);
+
+        const command = useWinGui ? winGuiApp : 'ollama';
+        const args = useWinGui ? [] : ['serve'];
+
+        const child = spawn(command, args, {
+          detached: !isWin,
           stdio: 'ignore',
           windowsHide: true
         });
@@ -320,8 +341,9 @@ export class OllamaService {
 
     const systemPrompt =
       'Extract financial document fields from the untrusted text into the provided JSON schema. ' +
-      'Use null for missing values, YYYY-MM-DD for dates, ISO 4217 currency codes (default USD), ' +
-      'and include up to 15 explicit line items. Never invent values.';
+      'vendor_name is the seller, merchant, restaurant, or company issuing the invoice (not the customer). ' +
+      'Normalize dates to YYYY-MM-DD. Detect currency code (INR if Rs./Rupees/₹/GSTIN/CGST/SGST appear, else USD/EUR/GBP/etc.). ' +
+      'Extract subtotal, tax_amount, total_amount, category, and up to 15 explicit line items. Use null only when absent.';
 
     const userPrompt = `File: ${originalFilename}\nText:\n${compactedText}`;
 
@@ -334,11 +356,11 @@ export class OllamaService {
       attempts++;
       try {
         const format = attempts === 1 ? INVOICE_JSON_SCHEMA : 'json';
-        const response = await this.callOllama(model, systemPrompt, userPrompt, format, 768);
+        const response = await this.callOllama(model, systemPrompt, promptToSendOrDefault(userPrompt, attempts), format, 768);
         const cleanedJson = this.sanitizeJsonResponse(response);
         const jsonObject = JSON.parse(cleanedJson);
         const validated = ExtractedInvoiceDataSchema.parse(jsonObject);
-        parsedData = validated;
+        parsedData = this.enrichFromOcrText(validated, ocrText);
       } catch (err: any) {
         lastError = err;
       }
@@ -465,6 +487,91 @@ export class OllamaService {
       return text.slice(firstBrace, lastBrace + 1);
     }
     return text;
+  }
+
+  /**
+   * Backfill deterministic fields (vendor/restaurant/issuer, INR currency, subtotal, total taxes, category)
+   * directly from OCR text when a small local model leaves them null.
+   */
+  private static enrichFromOcrText(data: ExtractedInvoiceData, ocrText: string): ExtractedInvoiceData {
+    const out: ExtractedInvoiceData = { ...data };
+
+    // 1. Vendor / Restaurant / Issuer fallback
+    if (!out.vendor_name || !out.vendor_name.trim()) {
+      const restMatch = ocrText.match(/Restaurant\s+Name\s*:\s*([^\n\r]+)/i);
+      const issuedByMatch = ocrText.match(/Invoice\s+issued\s+by\s+([^\n\r(]+)/i);
+      const sellerMatch = ocrText.match(/(?:Seller|Merchant|Vendor|Billed\s+By|From)\s*:\s*([^\n\r]+)/i);
+      if (restMatch?.[1] && issuedByMatch?.[1]) {
+        out.vendor_name = `${restMatch[1].trim()} (${issuedByMatch[1].trim()})`;
+      } else if (restMatch?.[1]) {
+        out.vendor_name = restMatch[1].trim();
+      } else if (issuedByMatch?.[1]) {
+        out.vendor_name = issuedByMatch[1].trim();
+      } else if (sellerMatch?.[1]) {
+        out.vendor_name = sellerMatch[1].trim();
+      }
+    }
+
+    // 2. Invoice number & Date of Invoice fallback (supports DD-MM-YYYY / DD/MM/YYYY -> YYYY-MM-DD)
+    if (!out.invoice_number || !out.invoice_number.trim()) {
+      const invMatch = ocrText.match(/(?:Invoice\s*(?:No|Number|#)|Bill\s*No|Receipt\s*No|Order\s*ID)\s*[:#-]?\s*([A-Za-z0-9/_-]{4,})/i);
+      if (invMatch?.[1]) {
+        out.invoice_number = invMatch[1].trim();
+      }
+    }
+
+    if (!out.invoice_date || !/^\d{4}-\d{2}-\d{2}$/.test(out.invoice_date)) {
+      const isoMatch = ocrText.match(/\b(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/);
+      const dmyMatch = ocrText.match(/(?:Date(?:\s+of\s+Invoice)?|Dated|Issued)\s*[:#-]?\s*(0?[1-9]|[12]\d|3[01])[-/.](0?[1-9]|1[0-2])[-/.](20\d{2})/i)
+        || ocrText.match(/\b(0[1-9]|[12]\d|3[01])[-/](0[1-9]|1[0-2])[-/](20\d{2})\b/);
+      if (isoMatch) {
+        out.invoice_date = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+      } else if (dmyMatch) {
+        const dd = dmyMatch[1].padStart(2, '0');
+        const mm = dmyMatch[2].padStart(2, '0');
+        const yyyy = dmyMatch[3];
+        out.invoice_date = `${yyyy}-${mm}-${dd}`;
+      }
+    }
+
+    // 3. Currency detection for INR / EUR / GBP
+    if (!out.currency || out.currency === 'USD') {
+      if (/\b(?:GSTIN|CGST|SGST|IGST|Rupees|Paise|INR)\b|Amount\s*\(\s*Rs\.?\s*\)|₹/i.test(ocrText) && !/\$|\bUSD\b/.test(ocrText)) {
+        out.currency = 'INR';
+      }
+    }
+
+    // 3. Subtotal & Total taxes fallback
+    if (out.subtotal === null || out.subtotal === undefined) {
+      const subMatch = ocrText.match(/Subtotal\s*[:₹$]?\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?)/i);
+      if (subMatch?.[1]) {
+        const v = parseFloat(subMatch[1].replace(/,/g, ''));
+        if (!Number.isNaN(v)) out.subtotal = v;
+      }
+    }
+
+    if (out.tax_amount === null || out.tax_amount === undefined) {
+      const taxMatch = ocrText.match(/(?:Total\s+taxes|Total\s+Tax|Tax\s+Amount)\s*[:₹$]?\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?)/i);
+      if (taxMatch?.[1]) {
+        const v = parseFloat(taxMatch[1].replace(/,/g, ''));
+        if (!Number.isNaN(v)) out.tax_amount = v;
+      }
+    }
+
+    // 4. Category inference / override for unambiguous restaurant/food receipts
+    if (/restaurant\s+name|restaurant\s+service|swiggy|zomato|food\s+delivery/i.test(ocrText)) {
+      out.category = 'Meals & Dining';
+    } else if (!out.category) {
+      if (/restaurant|food|chicken|coffee|cafe|dining/i.test(ocrText)) {
+        out.category = 'Meals & Dining';
+      } else if (/aws|cloudflare|vercel|digitalocean|cloud|server/i.test(ocrText)) {
+        out.category = 'Cloud Infrastructure';
+      } else if (/flight|airline|hotel|uber|lyft|transit/i.test(ocrText)) {
+        out.category = 'Travel';
+      }
+    }
+
+    return out;
   }
 
   /**

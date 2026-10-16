@@ -58,8 +58,20 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
     loadDashboard();
   }, [dateRange]);
 
-  const loadDashboard = async () => {
-    setIsLoading(true);
+  const hasProcessingDocs = Boolean(
+    data?.recentDocuments?.some(d => d.status === 'uploaded' || d.status === 'processing')
+  );
+
+  useEffect(() => {
+    if (!hasProcessingDocs) return;
+    const timer = setInterval(() => {
+      loadDashboard(true);
+    }, 1200);
+    return () => clearInterval(timer);
+  }, [hasProcessingDocs, dateRange]);
+
+  const loadDashboard = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     let startDate: string | undefined;
     const now = new Date();
     if (dateRange === '30d') {
@@ -131,7 +143,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           </div>
 
           <button
-            onClick={loadDashboard}
+            onClick={() => loadDashboard(false)}
             className="p-1.5 rounded-xl border border-slate-200 dark:border-[#1e3c2c] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#11241c] cursor-pointer"
             title="Refresh dashboard metrics"
           >
@@ -398,7 +410,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                       {doc.original_filename}
                     </td>
                     <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
-                      {doc.vendor_name || '—'}
+                      {doc.status === 'uploaded' || doc.status === 'processing'
+                        ? 'Extracting with Gemma AI…'
+                        : doc.vendor_name || '—'}
                     </td>
                     <td className="py-2.5 px-3">
                       <span className="capitalize text-slate-500">{doc.document_type}</span>
@@ -407,7 +421,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                       {doc.category || 'Other'}
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white">
-                      {doc.total_amount ? `$${doc.total_amount.toFixed(2)}` : '—'}
+                      {doc.total_amount !== null && doc.total_amount !== undefined
+                        ? `${doc.currency && doc.currency !== 'USD' ? `${doc.currency} ` : '$'}${Number(doc.total_amount).toFixed(2)}`
+                        : '—'}
                     </td>
                     <td className="py-2.5 px-3">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
@@ -415,9 +431,13 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                           ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                           : doc.status === 'needs_review'
                           ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                          : 'bg-slate-500/15 text-slate-500'
+                          : doc.status === 'uploaded' || doc.status === 'processing'
+                          ? 'bg-blue-500/15 text-blue-400 animate-pulse'
+                          : 'bg-rose-500/15 text-rose-400'
                       }`}>
-                        {doc.status.replace('_', ' ')}
+                        {doc.status === 'uploaded' || doc.status === 'processing'
+                          ? 'extracting…'
+                          : doc.status.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-right">

@@ -53,6 +53,7 @@ export const App: React.FC = () => {
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [isStartingOllama, setIsStartingOllama] = useState(false);
+  const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState(0);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -110,6 +111,11 @@ export const App: React.FC = () => {
       setIsStartingOllama(false);
       loadAppStatus();
     }
+  }, [loadAppStatus]);
+
+  const handleWorkspaceRefresh = useCallback(() => {
+    loadAppStatus();
+    setWorkspaceRefreshKey(k => k + 1);
   }, [loadAppStatus]);
 
   // Keyboard navigation: Escape key returns to the conveyor if no modal is active
@@ -355,7 +361,7 @@ export const App: React.FC = () => {
 
           {/* Main Full-Screen Workspace Body */}
           <main className="flex-1 overflow-y-auto bg-[#050A0B] text-slate-100">
-            <div key={currentTab} className="animate-in fade-in duration-200">
+            <div key={`${currentTab}-${workspaceRefreshKey}`} className="animate-in fade-in duration-200">
               {renderWorkspaceContent()}
             </div>
           </main>
@@ -366,13 +372,17 @@ export const App: React.FC = () => {
       <UploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
-        onUploadSuccess={loadAppStatus}
+        onUploadSuccess={handleWorkspaceRefresh}
+        onOpenReview={(docId) => {
+          setIsUploadOpen(false);
+          setSelectedReviewDocId(docId);
+        }}
       />
 
       <ReviewWorkspaceModal
         documentId={selectedReviewDocId}
         onClose={() => setSelectedReviewDocId(null)}
-        onRefresh={loadAppStatus}
+        onRefresh={handleWorkspaceRefresh}
       />
     </div>
   );
